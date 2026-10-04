@@ -1,0 +1,13 @@
+{
+  "name": "funnel-spine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "check": "node verify.mjs && node verify-lab.mjs",
+    "test": "npm run check"
+  }
+}
