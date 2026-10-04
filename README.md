@@ -21,7 +21,7 @@ The checks cover data validation, proportional geometry, configuration migration
 
 ## Vertical particle study
 
-Open **http://127.0.0.1:8000/lab/vertical-particles/** to tune falling dots between the vertical funnel containers beside a reference. Save configuration writes `designs/vertical-particles/latest.json` into this repository; Download JSON and Import JSON provide portable copies. See [particle study documentation](dist/lab/vertical-particles/README.md).
+Open **http://127.0.0.1:8000/lab/vertical-particles/** to tune falling dots between the vertical funnel containers. Save configuration writes `designs/vertical-particles/latest.json` into this repository; Download JSON and Import JSON provide portable copies. See [particle study documentation](dist/lab/vertical-particles/README.md).
 
 ## Project layout
 
