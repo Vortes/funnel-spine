@@ -2,10 +2,30 @@ import assert from 'node:assert/strict';
 globalThis.HTMLElement=class {};
 const {variants,createConfig,parseConfig,sampleData}=await import('./dist/lab/config.js');
 const {layoutGraph}=await import('./dist/lab/lab-engine.js');
-for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=350.000001);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
+for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=g.bottom+1e-8);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
+function verifySeparateRibbons(data,options={}){
+ const before=JSON.stringify(data),g=layoutGraph(data,options);assert.equal(JSON.stringify(data),before);assert.equal(g.nodes.length,data.nodes.length);assert.equal(g.nodes.filter(n=>!n.incoming.length).length,1);for(const n of g.nodes){assert(n.incoming.length<=1);if(n.outgoing.length)assert.equal(n.outgoing.reduce((sum,l)=>sum+l.value,0),n.value);}assert.equal(g.nodes.filter(n=>!n.outgoing.length).reduce((sum,n)=>sum+n.value,0),g.total);assert.equal(g.links.length,data.links.length);g.links.forEach((l,i)=>assert.equal(l.value,data.links[i].value));
+ for(const l of g.links){assert.equal(l.sourceNode.id,l.source);assert.equal(l.targetNode.id,l.target);assert.equal(l.targetNode.level,l.sourceNode.level+1);assert(l.sourceNode.x+g.nodeWidth<l.targetNode.x);}
+ for(let i=0;i<g.links.length;i++)for(let j=i+1;j<g.links.length;j++){
+  const a=g.links[i],b=g.links[j];if(a.sourceNode.level!==b.sourceNode.level)continue;
+  const [upper,lower]=a.sy<b.sy?[a,b]:[b,a];
+  assert(upper.sy+upper.width<=lower.sy+1e-8,`source overlap ${a.id}/${b.id}`);
+  assert(upper.ty+upper.width<=lower.ty+1e-8,`target crossing ${a.id}/${b.id}`);
+ }
+ for(const a of g.nodes)for(const b of g.nodes){if(a!==b&&a.level===b.level&&a.y<=b.y)assert(a.y+a.height<=b.y+1e-8);}
+ return g;
+}
+for(let seed=0;seed<128;seed++)for(const nodeGap of [28,66,85])verifySeparateRibbons(sampleData('branching',seed),{nodeGap});
+const denseTree={nodes:[{id:'root',label:'Root'},...['a','b','c'].flatMap(id=>[{id,label:id},...['x','y','z'].map(child=>({id:`${id}-${child}`,label:child}))])],links:[...['a','b','c'].map(target=>({source:'root',target,value:90})),...['a','b','c'].flatMap(source=>['x','y','z'].map(child=>({source,target:`${source}-${child}`,value:30})))]};verifySeparateRibbons(denseTree);
+const merged={nodes:['root','a','b','c'].map(id=>({id,label:id})),links:[{source:'root',target:'a',value:40},{source:'root',target:'b',value:60},{source:'a',target:'c',value:40},{source:'b',target:'c',value:60}]};assert.throws(()=>layoutGraph(merged),/more than one parent/);
+const partial={nodes:['a','b','c'].map(id=>({id,label:id})),links:[{source:'a',target:'b',value:100},{source:'b',target:'c',value:70}]};assert.throws(()=>layoutGraph(partial),/100%/);
+const declared={nodes:[{id:'a',label:'A',value:100},{id:'b',label:'B'}],links:[{source:'a',target:'b',value:90}]};assert.throws(()=>layoutGraph(declared),/declared 100/);
+const deep={nodes:Array.from({length:30},(_,i)=>({id:String(i),label:String(i)})),links:Array.from({length:29},(_,i)=>({source:String(i),target:String(i+1),value:100}))};assert(verifySeparateRibbons(deep,{nodeWidth:6}).width>900);
+const tree=verifySeparateRibbons(sampleData('branching',1234));assert.equal(tree.total,10400);assert.equal(tree.nodes.filter(n=>n.id.endsWith('-signup')).reduce((sum,n)=>sum+n.value,0),4279);assert.equal(tree.nodes.filter(n=>n.id.endsWith('-active')).reduce((sum,n)=>sum+n.value,0),1773);
+const oldSeed=createConfig('branching',1234);oldSeed.version=2;oldSeed.data=merged;const oldMigrated=parseConfig(oldSeed);assert.equal(oldMigrated.version,3);assert.deepEqual(oldMigrated.data,sampleData('branching',1234));assert.deepEqual(oldMigrated.options,oldSeed.options);oldSeed.dataOrigin='custom';assert.throws(()=>parseConfig(oldSeed),/more than one parent/);
 const bad=createConfig('continuous');bad.options.strokeWidth=3;assert.throws(()=>parseConfig(bad),/strokeWidth/);const cycle=createConfig('branching');cycle.data={nodes:[{id:'a',label:'A'},{id:'b',label:'B'}],links:[{source:'a',target:'b',value:1},{source:'b',target:'a',value:1}]};assert.throws(()=>parseConfig(cycle),/acyclic/);
 const legacy=createConfig('branching');legacy.version=1;legacy.options={...legacy.options,strokeWidth:1.2,nodeWidth:12,texture:'stipple',fillTint:.08,patternOpacity:.42};
-const migrated=parseConfig(legacy);assert.equal(migrated.version,2);assert.equal(migrated.options.strokeWidth,.75);assert.equal(migrated.options.nodeWidth,6);assert.equal(migrated.options.texture,'sparse');assert(!('fillTint' in migrated.options));assert(!('patternOpacity' in migrated.options));
+const migrated=parseConfig(legacy);assert.equal(migrated.version,3);assert.equal(migrated.options.strokeWidth,.75);assert.equal(migrated.options.nodeWidth,6);assert.equal(migrated.options.texture,'sparse');assert(!('fillTint' in migrated.options));assert(!('patternOpacity' in migrated.options));
 const {screenDefs,screenTypes,screenOrder,stippleField,INK,PAPER}=await import('./dist/lab/screens.js');
 class Element{constructor(tag){this.tag=tag;this.attrs={};this.children=[];}setAttribute(key,value){this.attrs[key]=value;}append(...children){this.children.push(...children);}}
 globalThis.document={createElementNS:(_,tag)=>new Element(tag)};
@@ -17,4 +37,4 @@ assert.deepEqual(dense.groups.map(g=>g.d),fine.groups.map(g=>g.d));assert(fine.g
 const densePattern=first.children.find(p=>p.attrs.id==='riso-dense');assert.equal(densePattern.attrs.width,'900');assert.equal(densePattern.attrs.height,'460');assert.equal(densePattern.children.length,7);
 const fineConfig=createConfig('continuous');fineConfig.options.dotGain=-.8;assert.deepEqual(parseConfig(fineConfig),fineConfig);fineConfig.options.dotGain=-.81;assert.throws(()=>parseConfig(fineConfig),/dotGain/);
 for(const type of screenTypes){const order=screenOrder(type);assert.equal(order[0],type);assert.equal(new Set(order).size,6);}
-console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, config validation, and branching geometry at control limits.');
+console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');

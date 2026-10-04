@@ -5,26 +5,41 @@ const make = (tag, attrs = {}, text) => { const el = document.createElementNS(NS
 const fmt = n => new Intl.NumberFormat('en-US').format(n);
 const pct = (n,d) => d ? `${(100*n/d).toFixed(1)}%` : '—';
 export function layoutGraph(data,{nodeGap=66,nodeWidth=2.5}={}) {
- validateData(data,'branching'); const nodes=data.nodes.map(n=>({...n,incoming:[],outgoing:[],level:0}));const map=new Map(nodes.map(n=>[n.id,n]));const links=data.links.map((l,i)=>({...l,id:`link-${i}`,sourceNode:map.get(l.source),targetNode:map.get(l.target)}));links.forEach(l=>{l.sourceNode.outgoing.push(l);l.targetNode.incoming.push(l);});
- let pending=[...nodes];const done=new Set();while(pending.length){const ready=pending.filter(n=>n.incoming.every(l=>done.has(l.source)));ready.forEach(n=>{n.level=n.incoming.length?Math.max(...n.incoming.map(l=>l.sourceNode.level))+1:0;n.value=Math.max(n.incoming.reduce((s,l)=>s+l.value,0),n.outgoing.reduce((s,l)=>s+l.value,0));done.add(n.id);});pending=pending.filter(n=>!done.has(n.id));}
- const depth=Math.max(...nodes.map(n=>n.level));const cols=Array.from({length:depth+1},(_,i)=>nodes.filter(n=>n.level===i)); const scale=Math.min(...cols.map(c=>(240-(c.length-1)*nodeGap)/c.reduce((s,n)=>s+n.value,0))); if(scale<=0)throw new Error('Too many nodes in one stage for this chart.');
- cols.forEach((col,i)=>{let y=110;col.forEach(n=>{n.x=50+i*790/depth;n.y=y;n.height=n.value*scale;y+=n.height+nodeGap;});});
- nodes.forEach(n=>{let a=n.y,b=n.y;n.outgoing.forEach(l=>{l.sy=a;l.width=l.value*scale;a+=l.width;});n.incoming.forEach(l=>{l.ty=b;b+=l.width;});});return {nodes,links,total:nodes.filter(n=>!n.incoming.length).reduce((s,n)=>s+n.value,0)};
+ validateData(data,'branching');
+ const nodes=data.nodes.map(n=>({...n,incoming:[],outgoing:[],level:0})),map=new Map(nodes.map(n=>[n.id,n]));
+ const links=data.links.map((l,i)=>({...l,id:`link-${i}`,sourceNode:map.get(l.source),targetNode:map.get(l.target)}));
+ links.forEach(l=>{l.sourceNode.outgoing.push(l);l.targetNode.incoming.push(l);});
+ const roots=nodes.filter(n=>!n.incoming.length);
+ if(roots.length!==1)throw new Error('Use one entry bucket for a branching funnel.');
+ for(const n of nodes){
+  if(n.incoming.length>1)throw new Error(`${n.label} has more than one parent. Give each branch its own child bucket.`);
+  const incoming=n.incoming.reduce((sum,l)=>sum+l.value,0),outgoing=n.outgoing.reduce((sum,l)=>sum+l.value,0),quantity=incoming||outgoing;
+  if(n.value!==undefined&&(!Number.isFinite(n.value)||n.value<=0||Math.abs(n.value-quantity)>1e-8*Math.max(1,n.value)))throw new Error(`${n.label}: links account for ${fmt(quantity)} of the declared ${fmt(n.value)}. Every split must account for 100%.`);n.value=quantity;
+  if(n.incoming.length&&n.outgoing.length&&Math.abs(incoming-outgoing)>1e-8*Math.max(1,incoming))throw new Error(`${n.label} distributes ${fmt(outgoing)} of ${fmt(incoming)}. Its children must account for 100%; add a remaining or drop-off bucket.`);
+ }
+ const root=roots[0],total=root.value,scale=240/total;
+ const measure=(n,level)=>{n.level=level;n.height=n.value*scale;n.span=Math.max(n.height,n.outgoing.reduce((sum,l)=>sum+measure(l.targetNode,level+1),0)+Math.max(0,n.outgoing.length-1)*nodeGap);return n.span;};measure(root,0);
+ const place=(n,top)=>{n.y=top+(n.span-n.height)/2;const childrenHeight=n.outgoing.reduce((sum,l)=>sum+l.targetNode.span,0)+Math.max(0,n.outgoing.length-1)*nodeGap;let y=top+(n.span-childrenHeight)/2;n.outgoing.forEach(l=>{place(l.targetNode,y);y+=l.targetNode.span+nodeGap;});};place(root,110);
+ const bottom=110+root.span,depth=Math.max(...nodes.map(n=>n.level)),width=Math.max(900,100+depth*160),columnStep=(width-100)/depth;
+ nodes.forEach(n=>{n.x=50+n.level*columnStep;let sy=n.y;n.outgoing.forEach(l=>{l.width=l.value*scale;l.sy=sy;l.ty=l.targetNode.y;sy+=l.width;});});
+ return {nodes,links,total,depth,bottom,height:Math.max(405,Math.ceil(bottom+55)),width,columnStep,nodeWidth};
 }
 export function renderFunnel(data,{variant='continuous',texture='mixed',density=7,strokeWidth=.5,color=INK,labels=true,curve=.5,idPrefix='atlas',chartHeight=235,stageHeight=310,stageGap=9,capCurve=12,tailRatio=.65,nodeGap=66,nodeWidth=2.5,patternAngle=-45,dotGain=.03,roughness=.15,paperGrain=false,seed=1234,fontSize=14,guides=true}={}) {
  if(!['continuous','vertical','branching'].includes(variant))throw new Error('Unknown funnel variant.');validateData(data,variant);
- const height=variant==='branching'?405:460;
- const svg=make('svg',{xmlns:NS,viewBox:`0 0 900 ${height}`,width:'100%',role:'group','aria-label':`${variant} conversion funnel`});
+ const graph=variant==='branching'?layoutGraph(data,{nodeGap,nodeWidth}):null;
+ const height=graph?.height??460,width=graph?.width??900;
+ const svg=make('svg',{xmlns:NS,viewBox:`0 0 ${width} ${height}`,width:'100%',role:'group','aria-label':`${variant} conversion funnel`});
+ if(width>900)svg.style.minWidth=`${width}px`;
  color=INK;strokeWidth*=4/3;
- svg.append(screenDefs({idPrefix,density,patternAngle,dotGain,roughness,seed,screenWidth:900,screenHeight:height}));
- svg.append(make('rect',{width:900,height,fill:paperGrain?`url(#${idPrefix}-grain)`:PAPER}));
+ svg.append(screenDefs({idPrefix,density,patternAngle,dotGain,roughness,seed,screenWidth:width,screenHeight:height}));
+ svg.append(make('rect',{width,height,fill:paperGrain?`url(#${idPrefix}-grain)`:PAPER}));
  const order=screenOrder(texture);
  const fillTypes=[];
  const chooseScreen=(i,neighbors=[])=>{const used=new Set(neighbors.map(key=>fillTypes[key]));let type=order[i%order.length];for(let j=0;j<order.length;j++){const candidate=order[(i+j)%order.length];if(!used.has(candidate)){type=candidate;break;}}fillTypes[i]=type;return `url(#${idPrefix}-${type})`;};
  const text=(x,y,t,size=13,extra={})=>make('text',{x,y,fill:color,'font-family':'Arial, Helvetica, sans-serif','font-size':size,...extra},t);
- const interactive=(path,key,info)=>{path.setAttribute('tabindex','0');path.setAttribute('role','button');path.setAttribute('aria-label',`${info.label}, ${fmt(info.value)}, ${pct(info.value,info.denominator)} conversion`);path.setAttribute('data-key',key);path.setAttribute('data-base-fill',path.getAttribute('fill'));if(roughness>0)path.setAttribute('filter',`url(#${idPrefix}-edge)`);path.atlasInfo=info;path.append(make('title',{},path.getAttribute('aria-label')));svg.append(path);};
+ const interactive=(path,key,info)=>{path.setAttribute('tabindex','0');path.setAttribute('role','button');path.setAttribute('aria-label',`${info.label}, ${fmt(info.value)}, ${pct(info.value,info.denominator)} conversion`);path.setAttribute('data-key',key);path.setAttribute('data-base-fill',path.getAttribute('fill'));if(roughness>0)path.setAttribute('filter',`url(#${idPrefix}-edge)`);path.atlasInfo={...info,key};path.append(make('title',{},path.getAttribute('aria-label')));svg.append(path);};
  if(variant==='branching'){
-  const g=layoutGraph(data,{nodeGap,nodeWidth}); const depth=Math.max(...g.nodes.map(n=>n.level));for(let i=0;i<=depth;i++){svg.append(text(50+i*790/depth,30,`0${i+1} / ${i===0?'ENTRY':i===depth?'OUTCOME':'CHANNEL'}`,11,{'text-anchor':i===depth?'end':'start'}));svg.append(make('line',{x1:50+i*790/depth,y1:48,x2:50+i*790/depth,y2:402,stroke:color,'stroke-dasharray':'2 5'}));}
+  const g=graph; const depth=g.depth;for(let i=0;i<=depth;i++){svg.append(text(50+i*g.columnStep,30,`0${i+1} / ${i===0?'ENTRY':i===depth?'OUTCOME':'BRANCH'}`,11,{'text-anchor':i===depth?'end':'start'}));svg.append(make('line',{x1:50+i*g.columnStep,y1:48,x2:50+i*g.columnStep,y2:height-3,stroke:color,'stroke-dasharray':'2 5'}));}
   g.links.forEach((l,i)=>{const x=l.sourceNode.x+nodeWidth,xx=l.targetNode.x;const c=(xx-x)*curve;const d=`M ${x} ${l.sy} C ${x+c} ${l.sy} ${xx-c} ${l.ty} ${xx} ${l.ty} L ${xx} ${l.ty+l.width} C ${xx-c} ${l.ty+l.width} ${x+c} ${l.sy+l.width} ${x} ${l.sy+l.width} Z`;interactive(make('path',{d,fill:chooseScreen(i,g.links.slice(0,i).map((prev,j)=>prev.source===l.source||prev.target===l.target||prev.target===l.source||prev.source===l.target?j:-1).filter(j=>j>=0)),stroke:color,'stroke-width':strokeWidth}),l.id,{label:`${l.sourceNode.label} → ${l.targetNode.label}`,value:l.value,denominator:l.sourceNode.value,total:g.total,source:l.source,target:l.target,kind:'link'});});
   g.nodes.forEach(n=>{svg.append(make('rect',{x:n.x,y:n.y,width:nodeWidth,height:n.height,fill:`url(#${idPrefix}-solid)`,stroke:color,'stroke-width':.35}));if(labels){svg.append(text(n.x,n.y-25,n.label,fontSize,{'text-anchor':n.level===depth?'end':'start'}));svg.append(text(n.x,n.y-7,fmt(n.value),fontSize-2,{'text-anchor':n.level===depth?'end':'start'}));}});svg.atlasLayout=g;
  }else{
