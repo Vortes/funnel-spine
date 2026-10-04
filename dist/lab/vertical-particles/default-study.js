@@ -1,4 +1,4 @@
-{
+export const defaultStudy={
   "version": 1,
   "kind": "vertical-particles",
   "funnel": {
@@ -61,4 +61,4 @@
     "drift": 1.5,
     "edgeAngle": 0
   }
-}
+};

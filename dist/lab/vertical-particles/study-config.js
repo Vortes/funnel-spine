@@ -1,11 +1,7 @@
-import {defaultConfigs} from '../default-configs.js';
+import {defaultStudy} from './default-study.js';
 
-export const particleRanges={size:[.5,2.5],count:[6,48],duration:[160,1200],drift:[0,8]};
-export function createStudy(){
-  const funnel=structuredClone(defaultConfigs.vertical);
-  Object.assign(funnel.options,{stageGap:16,labels:false,guides:false});
-  return {version:1,kind:'vertical-particles',funnel,particles:{size:1.5,count:24,duration:540,drift:2}};
-}
+export const particleRanges={size:[.5,2.5],count:[6,124],duration:[160,1200],drift:[0,8],edgeAngle:[0,70]};
+export function createStudy(){return structuredClone(defaultStudy);}
 export function parseStudy(input){
   if(input?.version!==1||input.kind!=='vertical-particles')throw new Error('Choose a vertical particle study configuration.');
   const funnel=input.funnel;
@@ -22,7 +18,7 @@ export function parseStudy(input){
   if(!['mixed','sparse','dense','am','hatch','cross','coarse'].includes(funnel.options.texture))throw new Error('Choose a supported screen sequence.');
   const particles={};
   for(const [key,[min,max]]of Object.entries(particleRanges)){
-    const value=input.particles?.[key];
+    const value=key==='edgeAngle'?(input.particles?.[key]??0):input.particles?.[key];
     if(!Number.isFinite(value)||value<min||value>max||(key==='count'&&!Number.isInteger(value)))throw new Error(`${key} must be between ${min} and ${max}.`);
     particles[key]=value;
   }

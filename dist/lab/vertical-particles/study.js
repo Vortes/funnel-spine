@@ -15,9 +15,10 @@ function render(rebuild=true){
 function controls(){
   const groups=[['particle-controls',[
     ['size','Dot radius',.5,2.5,.1,v=>`${v.toFixed(1)} px`],
-    ['count','Particle count',6,48,1,v=>`${v} max`],
+    ['count','Particle count',6,124,1,v=>`${v} max`],
     ['duration','Fall time',160,1200,20,v=>`${v} ms`],
-    ['drift','Sideways drift',0,8,.5,v=>`${v.toFixed(1)} px`]
+    ['drift','Sideways drift',0,8,.5,v=>`${v.toFixed(1)} px`],
+    ['edgeAngle','Edge angle',0,70,1,v=>`${v}° inward`]
   ],study.particles],['container-controls',[
     ['stageGap','Container gap',6,20,1,v=>`${v} px`],
     ['capCurve','Rim curvature',0,20,1,v=>`${v} px`]

@@ -1,7 +1,7 @@
 import {element,INK} from '../screens.js';
 
 export function particleGaps(study){
-  const {data,options,seed}=study.funnel,{size,count,duration,drift}=study.particles;
+  const {data,options,seed}=study.funnel,{size,count,duration,drift,edgeAngle=0}=study.particles;
   const height=options.stageHeight/data.length,center=390,max=data[0].value||1;
   let state=seed>>>0;
   const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
@@ -11,8 +11,20 @@ export function particleGaps(study){
     const edge=(x,curve)=>curve*(1-((x-center)/(width/2))**2);
     const points=Array.from({length:amount},(_,j)=>{
       const available=width/2-size,x=center-available+2*available*(j+.2+.6*random())/amount;
-      const dx=Math.max(center-available-x,Math.min(center+available-x,(random()*2-1)*drift));
+      const noise=(random()*2-1)*drift;
       const y=top+edge(x,options.capCurve/8)-size;
+      const weight=Math.max(0,(Math.abs((x-center)/available)-.5)/.5)**2;
+      const slope=-Math.sign(x-center)*Math.tan(edgeAngle*Math.PI/180)*weight;
+      let dx=Math.max(center-available-x,Math.min(center+available-x,noise));
+      if(weight&&edgeAngle){
+        const low=Math.max(center-available-x,Math.min(0,center-x)),high=Math.min(center+available-x,Math.max(0,center-x));
+        let a=low,b=high;
+        for(let step=0;step<32;step++){
+          const middle=(a+b)/2,travel=bottom+edge(x+middle,options.capCurve/2)+size-y;
+          if(middle-slope*travel-noise>0)b=middle;else a=middle;
+        }
+        dx=(a+b)/2;
+      }
       return {x,y,dx,dy:bottom+edge(x+dx,options.capCurve/2)+size-y,duration:duration*(.9+.2*random()),phase:random()};
     });
     const d=`M ${center-width/2} ${top} Q ${center} ${top+options.capCurve/4} ${center+width/2} ${top} L ${center+width/2} ${bottom} Q ${center} ${bottom+options.capCurve} ${center-width/2} ${bottom} Z`;
