@@ -1,3 +1,5 @@
+import {stippleImage} from './stipple-shader.js';
+
 export const INK = '#2F4FE0';
 export const PAPER = '#E4E5E8';
 const NS='http://www.w3.org/2000/svg';
@@ -7,6 +9,7 @@ export const screenLabels={sparse:'Sparse stipple',dense:'Dense stipple',am:'Fin
 export function seededRandom(seed){let a=seed>>>0;return()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
 export function screenOrder(texture){const start=screenTypes.indexOf(texture);return start<0?[...screenTypes]:[...screenTypes.slice(start),...screenTypes.slice(0,start)];}
 const stippleCache=new Map();
+export function clearVectorStippleCache(){stippleCache.clear();}
 export function stippleField({type='dense',width=900,height=460,density=6,dotGain=.03,seed=1234}={}){
  const pitch=Math.max(3,Math.min(14,density)),gain=Math.max(-.8,Math.min(.2,dotGain));
  const key=[type,width,height,pitch,seed].join('/');let field=stippleCache.get(key);
@@ -20,10 +23,10 @@ export function stippleField({type='dense',width=900,height=460,density=6,dotGai
  }
  return {...field,groups:field.groups.map(g=>({...g,radius:g.radius*(1+gain)}))};
 }
-export function screenDefs({idPrefix='riso',density=6,patternAngle=-45,dotGain=.03,seed=1234,roughness=.15,screenWidth=900,screenHeight=460,onlyType}={}){
+export function screenDefs({idPrefix='riso',density=6,patternAngle=-45,dotGain=.03,seed=1234,roughness=.15,screenWidth=900,screenHeight=460,onlyType,stippleRenderer='shader',stippleScale=2}={}){
  const defs=element('defs'),s=Math.max(3,Math.min(14,density));
  for(const[type,index]of (onlyType?[onlyType]:[...screenTypes,'solid','grain']).map((t,i)=>[t,i])){const stochastic=type==='sparse'||type==='dense',size=type==='coarse'?s*1.8:type==='grain'?128:s,width=stochastic?screenWidth:size,height=stochastic?screenHeight:size;const attrs={id:`${idPrefix}-${type}`,width,height,patternUnits:'userSpaceOnUse'};if(type==='hatch'||type==='cross')attrs.patternTransform=`rotate(${patternAngle})`;const p=element('pattern',attrs);p.append(element('rect',{width,height,fill:PAPER}));const rng=seededRandom(seed+index*104729);
- if(stochastic){const field=stippleField({type,width,height,density:s,dotGain,seed});p.setAttribute('data-dot-count',field.count);for(const group of field.groups)p.append(element('path',{d:group.d,fill:'none',stroke:INK,'stroke-width':group.radius*2,'stroke-linecap':'round'}));}
+ if(stochastic){const image=stippleRenderer==='shader'?stippleImage({type,width,height,density:s,dotGain,seed,scale:stippleScale}):null;if(image){p.setAttribute('data-dot-count',image.count);p.setAttribute('data-stipple-renderer','shader');p.append(element('image',{width,height,href:image.url,preserveAspectRatio:'none'}));}else{const field=stippleField({type,width,height,density:s,dotGain,seed});p.setAttribute('data-dot-count',field.count);p.setAttribute('data-stipple-renderer','vector');for(const group of field.groups)p.append(element('path',{d:group.d,fill:'none',stroke:INK,'stroke-width':group.radius*2,'stroke-linecap':'round'}));}}
  if(type==='am'||type==='coarse')p.append(element('circle',{cx:size/2,cy:size/2,r:size*Math.sqrt((type==='am'?.3:.7)/Math.PI)*(1+dotGain),fill:INK}));
  if(type==='hatch')p.append(element('path',{d:`M 0 ${size/2} H ${size}`,stroke:INK,'stroke-width':size*.5*(1+dotGain)}));
  if(type==='cross'){const width=size*(1-Math.sqrt(.5))*(1+dotGain);p.append(element('path',{d:`M 0 ${size/2} H ${size} M ${size/2} 0 V ${size}`,stroke:INK,'stroke-width':width}));}

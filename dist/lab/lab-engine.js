@@ -24,14 +24,14 @@ export function layoutGraph(data,{nodeGap=66,nodeWidth=2.5}={}) {
  nodes.forEach(n=>{n.x=50+n.level*columnStep;let sy=n.y;n.outgoing.forEach(l=>{l.width=l.value*scale;l.sy=sy;l.ty=l.targetNode.y;sy+=l.width;});});
  return {nodes,links,total,depth,bottom,height:Math.max(405,Math.ceil(bottom+55)),width,columnStep,nodeWidth};
 }
-export function renderFunnel(data,{variant='continuous',texture='mixed',density=7,strokeWidth=.5,color=INK,labels=true,curve=.5,idPrefix='atlas',chartHeight=235,stageHeight=310,stageGap=9,capCurve=12,tailRatio=.65,nodeGap=66,nodeWidth=2.5,patternAngle=-45,dotGain=.03,roughness=.15,paperGrain=false,seed=1234,fontSize=14,guides=true}={}) {
+export function renderFunnel(data,{variant='continuous',texture='mixed',density=7,strokeWidth=.5,color=INK,labels=true,curve=.5,idPrefix='atlas',chartHeight=235,stageHeight=310,stageGap=9,capCurve=12,tailRatio=.65,nodeGap=66,nodeWidth=2.5,patternAngle=-45,dotGain=.03,roughness=.15,paperGrain=false,seed=1234,fontSize=14,guides=true,stippleScale=2}={}) {
  if(!['continuous','vertical','branching'].includes(variant))throw new Error('Unknown funnel variant.');validateData(data,variant);
  const graph=variant==='branching'?layoutGraph(data,{nodeGap,nodeWidth}):null;
  const height=graph?.height??460,width=graph?.width??900;
  const svg=make('svg',{xmlns:NS,viewBox:`0 0 ${width} ${height}`,width:'100%',role:'group','aria-label':`${variant} conversion funnel`});
  if(width>900)svg.style.minWidth=`${width}px`;
  color=INK;strokeWidth*=4/3;
- svg.append(screenDefs({idPrefix,density,patternAngle,dotGain,roughness,seed,screenWidth:width,screenHeight:height}));
+ svg.append(screenDefs({idPrefix,density,patternAngle,dotGain,roughness,seed,screenWidth:width,screenHeight:height,stippleScale}));
  svg.append(make('rect',{width,height,fill:paperGrain?`url(#${idPrefix}-grain)`:PAPER}));
  const order=screenOrder(texture);
  const fillTypes=[];
