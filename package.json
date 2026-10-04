@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "check": "node verify.mjs && node verify-lab.mjs",
+    "check": "node verify.mjs && node verify-lab.mjs && node verify-particles.mjs",
     "test": "npm run check"
   }
 }

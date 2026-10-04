@@ -61,3 +61,5 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 }
 
 .canvas svg{user-select:none;-webkit-user-select:none}
+
+.figure-actions{display:flex;align-items:center;gap:16px}.figure-actions a{font-size:12px;text-decoration:underline;text-underline-offset:4px}
