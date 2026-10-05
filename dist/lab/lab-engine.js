@@ -55,10 +55,11 @@ function roundedPolygonPath(points,radius){
  return `M ${corners[0].entry.x} ${corners[0].entry.y} ${corners.map(({point,exit},i)=>`Q ${point.x} ${point.y} ${exit.x} ${exit.y} L ${corners[(i+1)%corners.length].entry.x} ${corners[(i+1)%corners.length].entry.y}`).join(' ')} Z`;
 }
 export function isometricStageGeometry(data,{stageHeight=310,stageGap=20,tailRatio=.65,isoDepth=36,isoRotation=30,borderRadius=0}={}){
- const center=360,topY=70,angle=isoRotation*Math.PI/180,baseline=Math.cos(Math.PI/6);
+ const angle=isoRotation*Math.PI/180,baseline=Math.cos(Math.PI/6);
  const dx=isoDepth*Math.sin(angle)/.5,rise=isoDepth*Math.cos(angle)/(baseline*Math.sqrt(3));
  const {widths:linearWidths}=verticalRimGeometry(data,{stageHeight,stageGap,tailRatio}),widths=linearWidths.map(width=>width*Math.cos(angle)/baseline);
  if(widths.some((width,i)=>i&&width>=widths[i-1]))throw new Error('Isometric stages need decreasing quantities and a terminal taper below 100%.');
+ const center=360+Math.max(0,60-(360-widths[0]/2+Math.min(0,dx))),topY=Math.max(70,rise+20);
  const scale=stageHeight/(widths[0]-widths.at(-1));
  const rimY=widths.map(width=>topY+(widths[0]-width)*scale);
  return data.map((stage,i)=>{
@@ -85,7 +86,9 @@ export function renderFunnel(data,{variant='continuous',texture='mixed',density=
  if(texture!=='mixed'&&!screenTypes.includes(texture))throw new Error('Choose a supported screen pattern.');
  const isometric=variant==='vertical'&&verticalView==='isometric';
  const graph=variant==='branching'?layoutGraph(data,{nodeGap,nodeWidth}):null;
- const height=graph?.height??460,width=graph?.width??900;
+ const stages=isometric?isometricStageGeometry(data,{stageHeight,stageGap,tailRatio,isoDepth,isoRotation,borderRadius}):null;
+ const annotationX=stages?Math.max(670,Math.ceil(stages[0].outerRight+56)):670;
+ const height=graph?.height??(stages?Math.max(460,Math.ceil(stages.at(-1).bottom+60)):460),width=graph?.width??(stages?Math.max(900,annotationX+230):900);
  const svg=make('svg',{xmlns:NS,viewBox:`0 0 ${width} ${height}`,width:'100%',role:'group','aria-label':`${variant} conversion funnel`});
  if(width>900)svg.style.minWidth=`${width}px`;
  color=INK;strokeWidth*=4/3;
@@ -123,11 +126,10 @@ export function renderFunnel(data,{variant='continuous',texture='mixed',density=
    });
    if(!mirror&&!edgeFade)svg.append(make('line',{x1:50,y1:365,x2:840,y2:365,stroke:color,'stroke-width':strokeWidth,'data-ink-baseline':''}));
   }else if(isometric){
-   const stages=isometricStageGeometry(data,{stageHeight,stageGap,tailRatio,isoDepth,isoRotation,borderRadius});
    if(borderRadius){const clips=make('defs');stages.forEach((stage,i)=>{const clip=make('clipPath',{id:`${idPrefix}-stage-clip-${i}`,clipPathUnits:'userSpaceOnUse'});clip.append(make('path',{d:stage.outline}));clips.append(clip);});svg.append(clips);}
    for(const [i,stage] of stages.entries()){const clip=borderRadius?{'clip-path':`url(#${idPrefix}-stage-clip-${i})`}:{};for(const [face,d,type] of [['side',stage.side,'cross'],['top',stage.top,'sparse']]){const path=make('path',{d,fill:`url(#${idPrefix}-${type})`,stroke:color,'stroke-width':strokeWidth,'pointer-events':'none','data-stage-face':stage.key,'data-face':face,'data-base-fill':`url(#${idPrefix}-${type})`,...clip});svg.append(path);}}
    stages.forEach((stage,i)=>{const s=data[i],clip=borderRadius?{'clip-path':`url(#${idPrefix}-stage-clip-${i})`}:{};interactive(make('path',{d:stage.front,fill:chooseScreen(i),stroke:color,'stroke-width':strokeWidth,...clip}),s.id,{label:s.label,value:s.value,denominator:data[i-1]?.value??max,total:max,kind:'stage'});if(borderRadius)svg.append(make('path',{d:stage.outline,fill:'none',stroke:color,'stroke-width':strokeWidth,'stroke-linejoin':'round','pointer-events':'none','data-stage-outline':stage.key}));});
-   if(labels)stages.forEach((stage,i)=>{const s=data[i],mid=(stage.y+stage.bottom)/2;svg.append(text(52,mid,`${String(i+1).padStart(2,'0')}`,12));svg.append(make('line',{x1:stage.outerRight+12,y1:mid,x2:655,y2:mid,stroke:color,'stroke-width':.5,'stroke-dasharray':'2 3'}));svg.append(text(670,mid-4,s.label,fontSize));svg.append(text(670,mid+15,`${fmt(s.value)} · ${pct(s.value,max)}`,fontSize-2));});
+   if(labels)stages.forEach((stage,i)=>{const s=data[i],mid=(stage.y+stage.bottom)/2;svg.append(text(52,mid,`${String(i+1).padStart(2,'0')}`,12));svg.append(make('line',{x1:stage.outerRight+12,y1:mid,x2:annotationX-15,y2:mid,stroke:color,'stroke-width':.5,'stroke-dasharray':'2 3'}));svg.append(text(annotationX,mid-4,s.label,fontSize));svg.append(text(annotationX,mid+15,`${fmt(s.value)} · ${pct(s.value,max)}`,fontSize-2));});
   }else{
    const height=stageHeight/data.length,center=390,{widths,radii}=verticalRimGeometry(data,{stageHeight,stageGap,tailRatio,borderRadius});data.forEach((s,i)=>{const y=70+i*height,w=widths[i],w2=widths[i+1],gap=stageGap;const d=verticalStagePath(center,y,height,w,w2,gap,capCurve,radii[i],radii[i+1]);interactive(make('path',{d,fill:chooseScreen(i),stroke:color,'stroke-width':strokeWidth}),s.id,{label:s.label,value:s.value,denominator:data[i-1]?.value??max,total:max,kind:'stage'});if(labels){svg.append(text(52,y+height/2,`${String(i+1).padStart(2,'0')}`,12));svg.append(make('line',{x1:center+w/2+12,y1:y+height/2,x2:655,y2:y+height/2,stroke:color,'stroke-width':.5,'stroke-dasharray':'2 3'}));svg.append(text(670,y+height/2-4,s.label,fontSize));svg.append(text(670,y+height/2+15,`${fmt(s.value)} · ${pct(s.value,max)}`,fontSize-2));}});
   }

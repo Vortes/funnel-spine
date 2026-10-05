@@ -3,7 +3,7 @@ import {layoutGraph,isometricStageGeometry} from './lab-engine.js';
 import {screenTypes} from './screens.js';
 import {defaultConfigs} from './default-configs.js';
 export const variants=['vertical','continuous','branching'];
-export const ranges={density:[3,14],strokeWidth:[.25,.75],patternAngle:[-90,90],dotGain:[-.8,.2],roughness:[0,.6],fontSize:[12,18],curve:[.1,.8],chartHeight:[120,265],edgeFade:[0,.45],stageHeight:[250,330],stageGap:[0,20],capCurve:[0,20],borderRadius:[0,20],tailRatio:[.15,1],isoDepth:[18,54],isoRotation:[-45,45],nodeGap:[28,85],nodeWidth:[1,6]};
+export const ranges={density:[3,14],strokeWidth:[.25,.75],patternAngle:[-90,90],dotGain:[-.8,.2],roughness:[0,.6],fontSize:[12,18],curve:[.1,.8],chartHeight:[120,265],edgeFade:[0,.45],stageHeight:[250,330],stageGap:[0,20],capCurve:[0,20],borderRadius:[0,20],tailRatio:[.15,1],isoDepth:[18,200],isoRotation:[-45,45],nodeGap:[28,85],nodeWidth:[1,6]};
 export const defaultOptions={texture:'mixed',density:6,strokeWidth:.5,patternAngle:-45,dotGain:.03,roughness:.15,paperGrain:false,fontSize:14,labels:true,guides:true,curve:.5,chartHeight:235,edgeFade:0,stageHeight:310,stageGap:9,capCurve:12,borderRadius:0,tailRatio:.65,nodeGap:66,nodeWidth:2.5};
 const verticalControlKeys=['texture','density','strokeWidth','patternAngle','dotGain','roughness','fontSize','labels','paperGrain','stageHeight','stageGap','capCurve','borderRadius','tailRatio','isoDepth','isoRotation'];
 const verticalSettings=options=>Object.fromEntries(verticalControlKeys.map(key=>[key,options[key]]));

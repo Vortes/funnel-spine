@@ -54,7 +54,7 @@ const oldContinuous=structuredClone(continuous);delete oldContinuous.options.mir
 const invalidMirror=structuredClone(continuous);invalidMirror.options.mirror='true';assert.throws(()=>parseConfig(invalidMirror),/mirror/);
 const invalidRadius=createConfig('vertical');invalidRadius.options.borderRadius=21;assert.throws(()=>parseConfig(invalidRadius),/borderRadius/);
 const {screenDefs,screenTypes,screenSwatch,stippleField,INK,PAPER}=await import('./dist/lab/screens.js');
-class Element{constructor(tag){this.tag=tag;this.attrs={};this.children=[];}setAttribute(key,value){this.attrs[key]=value;}getAttribute(key){return this.attrs[key]??null;}append(...children){this.children.push(...children);}}
+class Element{constructor(tag){this.tag=tag;this.attrs={};this.children=[];this.style={};}setAttribute(key,value){this.attrs[key]=value;}getAttribute(key){return this.attrs[key]??null;}append(...children){this.children.push(...children);}}
 globalThis.document={createElementNS:(_,tag)=>new Element(tag)};
 const first=screenDefs({seed:1234}),same=screenDefs({seed:1234}),different=screenDefs({seed:1235});assert.deepEqual(first,same);assert.notDeepEqual(first,different);
 const visit=node=>{for(const [name,value]of Object.entries(node.attrs)){if(['fill','stroke'].includes(name))assert([INK,PAPER,'none'].includes(value));assert(!name.includes('opacity'));}assert(!node.tag.includes('Gradient'));node.children.forEach(visit);};visit(first);
@@ -120,7 +120,16 @@ for(const rotation of [-45,0,30,45]){
 }
 const leftView=isometricStageGeometry(isometric.data,{...isometric.options,isoRotation:-30});
 assert(leftView[0].top.match(/-?\d+(?:\.\d+)?/g).map(Number)[2]<leftView[0].front.match(/-?\d+(?:\.\d+)?/g).map(Number)[0]);
+const deepConfig=createConfig('vertical');setVerticalControl(deepConfig.options,'isoDepth',200);assert.equal(parseConfig(deepConfig).options.isoDepth,200);
+for(const rotation of [-45,0,45]){
+ const options={...deepConfig.options,isoRotation:rotation},deepStages=isometricStageGeometry(deepConfig.data,options),deepSvg=renderFunnel(deepConfig.data,{...options,variant:'vertical'});
+ const [,,width,height]=deepSvg.attrs.viewBox.split(' ').map(Number);
+ for(const stage of deepStages)for(const path of [stage.front,stage.top,stage.side]){const coords=path.match(/-?\d+(?:\.\d+)?/g).map(Number);for(let i=0;i<coords.length;i+=2){assert(coords[i]>=0&&coords[i]<=width);assert(coords[i+1]>=0&&coords[i+1]<=height);}}
+ assert(deepStages.at(-1).bottom+50<=height);
+ if(rotation===0){const top=deepStages[0].top.match(/-?\d+(?:\.\d+)?/g).map(Number);assert(deepStages[0].y-top[3]>100);}
+}
 const invalidRotation=structuredClone(isometric);invalidRotation.options.isoRotation=50;assert.throws(()=>parseConfig(invalidRotation),/isoRotation/);
+const invalidDepth=structuredClone(deepConfig);setVerticalControl(invalidDepth.options,'isoDepth',202);assert.throws(()=>parseConfig(invalidDepth),/isoDepth/);
 const square=renderFunnel(verticalData,{variant:'vertical',verticalView:'flat',borderRadius:0});
 const rounded=renderFunnel(verticalData,{variant:'vertical',verticalView:'flat',borderRadius:20});
 const ribbons=svg=>svg.children.filter(child=>child.attrs['data-key']);
