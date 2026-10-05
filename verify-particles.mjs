@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {createStudy,parseStudy} from './dist/lab/vertical-particles/study-config.js';
 import {particleGaps} from './dist/lab/vertical-particles/particles.js';
+import {containerGeometry} from './dist/lab/vertical-particles/containers.js';
+import {particleFrame,containerFrame} from './dist/lab/vertical-particles/motion.js';
 
 const study=createStudy(),original=structuredClone(study);
 assert.deepEqual(parseStudy(study),study);
@@ -38,3 +40,29 @@ const bad=createStudy();bad.particles.count=10000;assert.throws(()=>parseStudy(b
 bad.particles.count=24;bad.funnel.data[1].value=20000;assert.throws(()=>parseStudy(bad),/quantities/);
 const zero=createStudy();zero.funnel.data.forEach(stage=>stage.value=0);assert(particleGaps(zero).every(gap=>gap.points.length===0));
 console.log('Verified seeded particle streams, 64 control extremes, curved-rim entry and exit, quantity-dependent counts, and configuration validation.');
+
+const rounded=createStudy();rounded.funnel.options.cornerRadius=18;
+const unrounded=createStudy();
+for(let i=0;i<rounded.funnel.data.length;i++){
+  const shape=containerGeometry(rounded,i);assert(!/NaN|Infinity/.test(shape.path));
+  assert(shape.radius>=0&&shape.radius<=18);assert(shape.topLeft>=390-shape.width/2&&shape.topRight<=390+shape.width/2);
+  assert.notEqual(shape.path,containerGeometry(unrounded,i).path);
+}
+for(const radius of [0,18])for(const tension of [0,4])for(const recoil of [0,3])for(const absorption of [0,1]){
+ const config=createStudy();config.funnel.options.cornerRadius=radius;Object.assign(config.particles,{tension,recoil,absorption});parseStudy(config);
+ const gaps=particleGaps(config);
+ for(const gap of gaps)for(const p of gap.points){
+  const source=containerGeometry(config,gap.index),target=containerGeometry(config,gap.index+1);
+  assert(p.x-config.particles.size>=source.bottomLeft-1e-8&&p.x+config.particles.size<=source.bottomRight+1e-8);
+  assert(p.x+p.dx-config.particles.size>=target.topLeft-1e-8&&p.x+p.dx+config.particles.size<=target.topRight+1e-8);
+  const hitAge=p.duration*Math.sqrt(Math.max(0,(p.dy-2*config.particles.size)/p.dy));
+  const falling=particleFrame(config,p,p.duration*.5),hit=particleFrame(config,p,hitAge),absorbed=particleFrame(config,p,(hitAge+p.duration)/2);
+  assert.equal(falling.opacity,1);assert(Math.abs(hit.y-(p.dy-2*config.particles.size))<1e-8);
+  if(absorption){assert(absorbed.sy<1&&absorbed.sx>1&&absorbed.opacity<1&&absorbed.y>hit.y);}else{assert.equal(absorbed.sx,1);assert.equal(absorbed.sy,1);}
+ }
+ for(let index=0;index<config.funnel.data.length;index++)for(let time=0;time<config.particles.duration*1.1;time+=30){const frame=containerFrame(config,gaps,index,time);assert(frame.scale>=.92&&frame.scale<=1.08+1e-8);assert(Number.isFinite(frame.shift));if(!tension&&!recoil&&!absorption)assert.deepEqual(frame,{shift:0,scale:1});}
+}
+const migration=createStudy();delete migration.particles.tension;delete migration.particles.recoil;delete migration.particles.absorption;delete migration.funnel.options.cornerRadius;
+const normalized=parseStudy(migration);assert.equal(normalized.particles.tension,1.2);assert.equal(normalized.particles.recoil,.8);assert.equal(normalized.particles.absorption,.6);assert.equal(normalized.funnel.options.cornerRadius,0);
+const badRadius=createStudy();badRadius.funnel.options.cornerRadius=19;assert.throws(()=>parseStudy(badRadius),/cornerRadius/);
+console.log('Verified rounded-rim contacts, synchronized condensation and absorption, bounded recoil, disabled effects, and legacy surface-setting migration.');

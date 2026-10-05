@@ -74,10 +74,10 @@ export const defaultConfigs={
       "chartHeight": 235,
       "edgeFade": 0,
       "stageHeight": 330,
-      "stageGap": 3,
+      "stageGap": 4,
       "capCurve": 0,
-      "borderRadius": 0,
-      "tailRatio": 0.45,
+      "borderRadius": 4,
+      "tailRatio": 0.6,
       "nodeGap": 66,
       "nodeWidth": 2.5
     },

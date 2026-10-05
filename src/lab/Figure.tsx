@@ -17,6 +17,8 @@ function paths(svg: LabSvg): LabPath[] {
 }
 
 function highlight(svg: LabSvg, info: PathInfo | null, selectedKey: string | null) {
+  svg.atlasClearPull?.();
+  svg.atlasHighlightedKey = info?.key ?? null;
   const linked = new Set<string>();
   if (info?.kind === 'link' && svg.atlasLayout) {
     const links = svg.atlasLayout.links;
@@ -39,6 +41,73 @@ function highlight(svg: LabSvg, info: PathInfo | null, selectedKey: string | nul
     else path.setAttribute('stroke-dasharray', '2 4');
     path.setAttribute('aria-pressed', String(selectedKey === path.atlasInfo.key));
     path.atlasEmphasis?.setAttribute('data-emphasis', String(Boolean(info) && active));
+  });
+}
+
+function attachProximity(svg: LabSvg, sections: LabPath[], canvas: HTMLDivElement, axis: 'x' | 'y', selected: RefObject<string | null>, hover: RefObject<PathInfo | null>, onInspect: (info: PathInfo | null) => void) {
+  const radius = 24;
+  let pulled: SVGPathElement | null = null;
+  svg.atlasClearPull = () => {
+    pulled?.style.removeProperty('--pull-x');
+    pulled?.style.removeProperty('--pull-y');
+    pulled = null;
+  };
+  svg.addEventListener('pointerleave', event => {
+    if (event.pointerType !== 'mouse') return;
+    hover.current = null;
+    const pinned = sections.find(path => path.atlasInfo.key === selected.current)?.atlasInfo ?? null;
+    highlight(svg, pinned, selected.current);
+    if (pinned) onInspect(pinned);
+  });
+  if (typeof svg.createSVGPoint !== 'function' || sections.some(path => typeof path.getTotalLength !== 'function')) return;
+  const contours = sections.map(path => {
+    const length = path.getTotalLength();
+    const count = Math.max(1, Math.ceil(length / 12));
+    return { path, bounds: path.getBBox(), points: Array.from({ length: count + 1 }, (_, index) => path.getPointAtLength(length * index / count)) };
+  });
+  const show = (info: PathInfo | null) => {
+    if (svg.atlasHighlightedKey === (info?.key ?? null)) return;
+    hover.current = info;
+    highlight(svg, info, null);
+    if (info) onInspect(info);
+  };
+  svg.addEventListener('pointermove', event => {
+    if (event.pointerType !== 'mouse' || selected.current || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    canvas.dataset.motion = 'pointer';
+    const section = (event.target as Element).closest('path[data-key]') as LabPath | null;
+    if (section) {
+      svg.atlasClearPull?.();
+      show(section.atlasInfo);
+      return;
+    }
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return;
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const cursor = point.matrixTransform(matrix.inverse());
+    let nearest: { path: LabPath; dx: number; dy: number; distance: number } | null = null;
+    for (const { path, bounds, points } of contours) {
+      if (cursor.x < bounds.x - radius || cursor.x > bounds.x + bounds.width + radius || cursor.y < bounds.y - radius || cursor.y > bounds.y + bounds.height + radius) continue;
+      for (let index = 1; index < points.length; index++) {
+        const a = points[index - 1], b = points[index], vx = b.x - a.x, vy = b.y - a.y, length = vx * vx + vy * vy;
+        if (!length) continue;
+        const t = Math.max(0, Math.min(1, ((cursor.x - a.x) * vx + (cursor.y - a.y) * vy) / length));
+        const dx = cursor.x - a.x - t * vx, dy = cursor.y - a.y - t * vy, distance = dx * dx + dy * dy;
+        if (axis === 'x' ? Math.abs(dx) <= Math.abs(dy) : Math.abs(dy) <= Math.abs(dx)) continue;
+        if (!nearest || distance < nearest.distance) nearest = { path, dx, dy, distance };
+      }
+    }
+    if (!nearest || nearest.distance >= radius * radius) { show(null); return; }
+    show(nearest.path.atlasInfo);
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { svg.atlasClearPull?.(); return; }
+    const distance = Math.sqrt(nearest.distance), offset = axis === 'x' ? nearest.dx : nearest.dy;
+    const pull = Math.sign(offset) * Math.min(5, Math.abs(offset) * 2) * (1 - distance / radius);
+    const emphasis = nearest.path.atlasEmphasis!;
+    if (pulled && pulled !== emphasis) svg.atlasClearPull?.();
+    emphasis.style.setProperty('--pull-x', `${axis === 'x' ? pull : 0}px`);
+    emphasis.style.setProperty('--pull-y', `${axis === 'y' ? pull : 0}px`);
+    pulled = emphasis;
   });
 }
 
@@ -97,7 +166,6 @@ function FunnelCanvas({ config, selectedKey, onSelect, onInspect, onPathsChange,
           canvas.dataset.motion = 'pointer';
           preview();
         });
-        path.addEventListener('pointerleave', restore);
         path.addEventListener('pointerdown', event => { canvas.dataset.motion = event.pointerType === 'mouse' ? 'pointer' : 'instant'; });
         path.addEventListener('focus', () => { canvas.dataset.motion = 'instant'; preview(); });
         path.addEventListener('blur', () => { canvas.dataset.motion = 'instant'; restore(); });
@@ -108,6 +176,7 @@ function FunnelCanvas({ config, selectedKey, onSelect, onInspect, onPathsChange,
           if (event.key === 'Escape') { selected.current = null; onSelect(null); highlight(svg, null, null); onInspect(path.atlasInfo); }
         });
       });
+      attachProximity(svg, ribbons, canvas, config.variant === 'vertical' ? 'y' : 'x', selected, hover, onInspect);
       const infos = ribbons.map(path => path.atlasInfo);
       onPathsChange(infos);
       onRenderError(null);

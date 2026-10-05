@@ -10,6 +10,8 @@ function browser(html) {
   globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ config: null }) });
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
+  Object.defineProperty(dom.window.document, 'timeline', { value: { currentTime: 0 } });
+  dom.window.Element.prototype.animate = () => ({ play() {}, pause() {}, cancel() {}, startTime: 0 });
   return dom;
 }
 

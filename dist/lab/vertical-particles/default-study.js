@@ -24,7 +24,8 @@ export const defaultStudy={
       "capCurve": 0,
       "tailRatio": 0.45,
       "nodeGap": 66,
-      "nodeWidth": 2.5
+      "nodeWidth": 2.5,
+      "cornerRadius": 0
     },
     "data": [
       {
@@ -59,6 +60,9 @@ export const defaultStudy={
     "count": 124,
     "duration": 540,
     "drift": 0,
-    "edgeAngle": 58
+    "edgeAngle": 58,
+    "tension": 1.2,
+    "recoil": 0.8,
+    "absorption": 0.6
   }
 };

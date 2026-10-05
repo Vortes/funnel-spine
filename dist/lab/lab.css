@@ -50,11 +50,11 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 .toggle input:checked{background:var(--ink);background-clip:content-box;padding:3px}
 .saved-heading h2{font:700 25px/1.2 Arial,Helvetica,sans-serif;letter-spacing:-.7px}
 
-.canvas .section-emphasis{opacity:0;transform:scale(1.015);transform-box:fill-box;transform-origin:center;pointer-events:none}
-.canvas .section-emphasis[data-emphasis=true]{opacity:1;transform:scale(1)}
+.canvas .section-emphasis{opacity:0;transform:translate(var(--pull-x,0px),var(--pull-y,0px)) scale(1.015);transform-box:fill-box;transform-origin:center;pointer-events:none}
+.canvas .section-emphasis[data-emphasis=true]{opacity:1;transform:translate(var(--pull-x,0px),var(--pull-y,0px)) scale(1)}
 @media(hover:hover) and (pointer:fine){
  .canvas[data-motion=pointer] .section-emphasis{transition:transform 110ms cubic-bezier(.215,.61,.355,1),opacity 110ms ease}
- .canvas[data-motion=pointer] .section-emphasis[data-emphasis=true]{transition-duration:150ms}
+ .canvas[data-motion=pointer] .section-emphasis[data-emphasis=true]{transition:transform 90ms cubic-bezier(.215,.61,.355,1),opacity 150ms ease}
 }
 @media(prefers-reduced-motion:reduce){
  .canvas[data-motion=pointer] .section-emphasis,.canvas[data-motion=pointer] .section-emphasis[data-emphasis=true]{transition:none;transform:none}

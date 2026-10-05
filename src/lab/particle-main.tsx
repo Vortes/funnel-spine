@@ -3,11 +3,13 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { renderFunnel } from '../../dist/lab/lab-engine.js';
 import { createStudy, parseStudy } from '../../dist/lab/vertical-particles/study-config.js';
 import { addParticles, particleGaps } from '../../dist/lab/vertical-particles/particles.js';
+import { roundContainers } from '../../dist/lab/vertical-particles/containers.js';
+import { animateTransfer } from '../../dist/lab/vertical-particles/motion.js';
 import { download } from './utils';
-import type { LabOptions, ParticleStudy } from './types';
+import type { ParticleStudy } from './types';
 
 type ParticleKey = keyof ParticleStudy['particles'];
-type ContainerKey = 'stageGap' | 'capCurve';
+type ContainerKey = 'stageGap' | 'capCurve' | 'cornerRadius';
 type Slider = { key: ParticleKey | ContainerKey; label: string; min: number; max: number; step: number; format: (value: number) => string };
 
 const particleSliders: Slider[] = [
@@ -17,9 +19,15 @@ const particleSliders: Slider[] = [
   { key: 'drift', label: 'Sideways drift', min: 0, max: 8, step: .5, format: value => `${value.toFixed(1)} px` },
   { key: 'edgeAngle', label: 'Edge angle', min: 0, max: 70, step: 1, format: value => `${value}° inward` },
 ];
+const surfaceSliders: Slider[] = [
+  { key: 'absorption', label: 'Absorption', min: 0, max: 1, step: .05, format: value => `${Math.round(value * 100)}%` },
+  { key: 'tension', label: 'Release tension', min: 0, max: 4, step: .1, format: value => `${value.toFixed(1)} px` },
+  { key: 'recoil', label: 'Container recoil', min: 0, max: 3, step: .1, format: value => `${value.toFixed(1)} px` },
+];
 const containerSliders: Slider[] = [
   { key: 'stageGap', label: 'Container gap', min: 6, max: 20, step: 1, format: value => `${value} px` },
   { key: 'capCurve', label: 'Rim curvature', min: 0, max: 20, step: 1, format: value => `${value} px` },
+  { key: 'cornerRadius', label: 'Border radius', min: 0, max: 18, step: 1, format: value => `${value} px` },
 ];
 
 function StudyRange({ slider, value, onChange }: { slider: Slider; value: number; onChange: (value: number) => void }) {
@@ -28,17 +36,32 @@ function StudyRange({ slider, value, onChange }: { slider: Slider; value: number
   </div>;
 }
 
-function ParticlePreview({ study, paused, hostRef }: { study: ParticleStudy; paused: boolean; hostRef: RefObject<HTMLDivElement | null> }) {
+function ParticlePreview({ study, paused, reduced, hostRef }: { study: ParticleStudy; paused: boolean; reduced: boolean; hostRef: RefObject<HTMLDivElement | null> }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const motionRef = useRef<ReturnType<typeof animateTransfer> | null>(null);
   useEffect(() => {
     const svg = renderFunnel(study.funnel.data, { ...study.funnel.options, variant: 'vertical', seed: study.funnel.seed, idPrefix: 'particle-study' }) as SVGSVGElement;
     svg.querySelectorAll('[data-key]').forEach(path => { path.removeAttribute('tabindex'); path.removeAttribute('role'); });
     svg.setAttribute('viewBox', study.funnel.options.labels ? '0 50 900 380' : '130 50 520 380');
+    roundContainers(svg, study);
     hostRef.current?.replaceChildren(svg);
     svgRef.current = svg;
     return () => { svgRef.current = null; svg.remove(); };
   }, [study.funnel, hostRef]);
-  useEffect(() => { if (svgRef.current) addParticles(svgRef.current, study); }, [study]);
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const gaps = addParticles(svg, study);
+    const motion = animateTransfer(svg, study, gaps);
+    motionRef.current = motion;
+    motion.setReducedMotion(reduced);
+    motion.setPaused(paused);
+    return () => { motion.dispose(); motionRef.current = null; };
+  }, [study]);
+  useEffect(() => {
+    motionRef.current?.setReducedMotion(reduced);
+    motionRef.current?.setPaused(paused);
+  }, [paused, reduced]);
   return <div id="preview" ref={hostRef} data-paused={String(paused)} />;
 }
 
@@ -101,7 +124,7 @@ function App() {
 
   function updateContainer(key: ContainerKey, value: number) {
     edited.current = true;
-    setStudy(current => ({ ...current, funnel: { ...current.funnel, options: { ...current.funnel.options, [key]: value } as LabOptions } }));
+    setStudy(current => ({ ...current, funnel: { ...current.funnel, options: { ...current.funnel.options, [key]: value } } }));
     setStatus({ text: 'Unsaved changes', error: false });
   }
 
@@ -143,15 +166,17 @@ function App() {
     </div></div>
     <div className="workspace"><aside aria-label="Particle controls"><h2>Particles</h2><div id="particle-controls">
       {particleSliders.map(slider => <StudyRange key={slider.key} slider={slider} value={study.particles[slider.key as ParticleKey]} onChange={value => updateParticle(slider.key as ParticleKey, value)} />)}
+    </div><h2>Surface response</h2><div id="surface-controls">
+      {surfaceSliders.map(slider => <StudyRange key={slider.key} slider={slider} value={study.particles[slider.key as ParticleKey]} onChange={value => updateParticle(slider.key as ParticleKey, value)} />)}
     </div><h2>Containers</h2><div id="container-controls">
       {containerSliders.map(slider => <StudyRange key={slider.key} slider={slider} value={study.funnel.options[slider.key as ContainerKey]} onChange={value => updateContainer(slider.key as ContainerKey, value)} />)}
     </div><label className="toggle" htmlFor="labels">Stage annotations<input id="labels" type="checkbox" checked={study.funnel.options.labels} onChange={event => { edited.current = true; setStudy(current => ({ ...current, funnel: { ...current.funnel, options: { ...current.funnel.options, labels: event.target.checked } } })); setStatus({ text: 'Unsaved changes', error: false }); }} /></label>
       <button id="reset" onClick={() => { edited.current = true; setStudy(createStudy() as ParticleStudy); setStatus({ text: 'Study reset. Save to keep these settings.', error: false }); }}>Reset study</button>
       <div className="file-actions"><button id="export" onClick={() => download(JSON.stringify(parseStudy(study), null, 2) + '\n', 'atlas-vertical-particles.json', 'application/json')}>Download JSON</button><button id="import" onClick={() => fileRef.current?.click()}>Import JSON</button><input id="file" ref={fileRef} type="file" accept="application/json,.json" hidden onChange={event => void importStudy(event.target.files?.[0])} /></div>
-      <p id="motion-note">{reduced ? 'Reduced motion is on. Particles are shown as still dots.' : 'Staggered, accelerating falls. Pausing freezes the current frame.'}</p>
+      <p id="motion-note">{reduced ? 'Reduced motion is on. Particles are shown as still dots.' : 'Condense, release, absorb. Pause freezes the whole transfer cycle.'}</p>
       <p id="status" role="status" aria-live="polite" data-error={String(status.error)}>{status.text}</p>
     </aside><section className="study-preview" aria-label="Live preview"><figure><figcaption><span>01 / LIVE STUDY</span><span id="summary">{amount} dots · {study.particles.duration} ms</span></figcaption>
-      <ParticlePreview study={study} paused={effectivePause} hostRef={previewRef} />
+      <ParticlePreview study={study} paused={effectivePause} reduced={reduced} hostRef={previewRef} />
       <p className="caption">Dots illustrate transfer; quantities remain encoded by the containers.</p>
     </figure></section></div>
   </main></>;

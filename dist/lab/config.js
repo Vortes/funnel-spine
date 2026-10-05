@@ -28,7 +28,9 @@ export function parseConfig(input){
  const source={...input.options};
  if(input.version===1){source.strokeWidth=Math.min(.75,Math.max(.25,(source.strokeWidth??1)*.75));source.nodeWidth=Math.min(6,Math.max(1,source.nodeWidth??2.5));source.texture=source.texture==='stipple'?'sparse':source.texture==='solid'?'mixed':source.texture;}
  if(source.texture===undefined)throw new Error('Choose a supported screen sequence.');
- const options=normalizeOptions(source,{...defaultOptions,...defaultConfigs[input.variant].options},{strict:false});
+ const defaults={...defaultOptions,...defaultConfigs[input.variant].options};
+ if(input.variant==='vertical'&&source.borderRadius===undefined)defaults.borderRadius=0;
+ const options=normalizeOptions(source,defaults,{strict:false});
  const data=input.version<3&&input.variant==='branching'&&input.dataOrigin==='seed'?sampleData('branching',input.seed):input.data;
  validateData(data,input.variant);if(input.variant==='branching')layoutGraph(data,options);
  return{version:3,variant:input.variant,seed:input.seed,dataOrigin:input.dataOrigin==='custom'?'custom':'seed',options,data:structuredClone(data)};
