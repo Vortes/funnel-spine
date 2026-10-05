@@ -66,23 +66,20 @@ function attachProximity(svg,sections,axis){
  });
  svg.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'){highlight(pinned);if(pinned)inspect(pinned);}});
 }
-function printEntrance(chart,kind,mirrored=false){
+function printEntrance(chart,kind){
  chart.classList.add('chart-intro',`chart-intro--${kind}`);
- if(kind==='continuous'&&mirrored)chart.classList.add('chart-intro--mirrored');
  const mark=(node,step)=>{node.classList.add('print-mark');node.style.setProperty('--print-step',step);};
  const ribbons=[...chart.querySelectorAll('path[data-key]')];
- if(kind==='branching'){
+ if(kind==='branching'||kind==='continuous'){
   const [, , width,height]=chart.getAttribute('viewBox').split(' ').map(Number),id='lab-figure-print-wipe';
   const clip=element('clipPath',{id,clipPathUnits:'userSpaceOnUse'});
   clip.append(element('rect',{x:0,y:0,width,height,class:'print-wipe'}));
   const defs=element('defs');defs.append(clip);chart.prepend(defs);
-  const bars=[...chart.querySelectorAll(':scope > rect')].slice(1);
-  for(const node of [...ribbons,...bars]){
+  const otherMarks=kind==='branching'?[...chart.querySelectorAll(':scope > rect')].slice(1):[...chart.querySelectorAll('[data-ink-baseline]')];
+  for(const node of [...ribbons,...otherMarks]){
    node.setAttribute('clip-path',`url(#${id})`);
    node.atlasEmphasis?.setAttribute('clip-path',`url(#${id})`);
   }
- }else if(kind==='continuous'){
-  ribbons.forEach((path,i)=>mark(path,i));
  }else{
   ribbons.forEach((path,i)=>mark(path,i));
   const steps=new Map(ribbons.map((path,i)=>[path.dataset.key,i]));
@@ -100,7 +97,7 @@ function render(intro=false){const config=state[variant];try{const next=renderFu
  p.addEventListener('keydown',e=>{$('#canvas').dataset.motion='instant';if(e.key==='Enter'||e.key===' '){e.preventDefault();select(p.atlasInfo);}if(e.key==='Escape'){pinned=null;highlight(null);inspect(p.atlasInfo);}});
  });
  attachProximity(svg,paths(),variant==='vertical'?'y':'x');
- highlight(pinned);inspect(pinned||paths()[0]?.atlasInfo);$('.figure-subtitle').textContent=variant==='branching'?'One entry bucket. Every split distributes 100% to its children.':'A study of quantity, progression, and loss.';$('#figure-title').textContent=titles[variant];$('#figure-number').textContent=`FIG. 00${variants.indexOf(variant)+1}`;$('#figure-caption').textContent=variant==='vertical'?captions.vertical[config.options.verticalView]:variant==='continuous'?captions.continuous[config.options.mirror?'mirrored':'half']:captions.branching;document.querySelectorAll('[data-variant]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.variant===variant)));$('#config-code').textContent=JSON.stringify(config,null,2);$('#compare-view p').textContent=variant==='branching'?'Conversion uses the parent bucket quantity. Every split accounts for 100%, including drop-off.':'Conversion uses the preceding stage quantity. Of total uses the entry quantity.';comparison();legend();if(intro)printEntrance(svg,variant,config.options.mirror);}
+ highlight(pinned);inspect(pinned||paths()[0]?.atlasInfo);$('.figure-subtitle').textContent=variant==='branching'?'One entry bucket. Every split distributes 100% to its children.':'A study of quantity, progression, and loss.';$('#figure-title').textContent=titles[variant];$('#figure-number').textContent=`FIG. 00${variants.indexOf(variant)+1}`;$('#figure-caption').textContent=variant==='vertical'?captions.vertical[config.options.verticalView]:variant==='continuous'?captions.continuous[config.options.mirror?'mirrored':'half']:captions.branching;document.querySelectorAll('[data-variant]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.variant===variant)));$('#config-code').textContent=JSON.stringify(config,null,2);$('#compare-view p').textContent=variant==='branching'?'Conversion uses the parent bucket quantity. Every split accounts for 100%, including drop-off.':'Conversion uses the preceding stage quantity. Of total uses the entry quantity.';comparison();legend();if(intro)printEntrance(svg,variant);}
 
 function legend(){const holder=$('#screen-legend');holder.replaceChildren();const names=state[variant].options.texture==='mixed'?screenTypes:[state[variant].options.texture];for(const type of names){const item=document.createElement('div');item.className='legend-item';item.append(screenSwatch(type,{...state[variant].options,seed:state[variant].seed},`legend-${type}`));const label=document.createElement('span');label.textContent=screenLabels[type];const caption=document.createElement('small');caption.textContent=state[variant].options.texture==='mixed'?'MIXED SCREEN':'FULL CHART';label.append(caption);item.append(label);holder.append(item);}}
 

@@ -121,7 +121,7 @@ export function renderFunnel(data,{variant='continuous',texture='mixed',density=
     }
     svg.append(text(x,417,`${String(i+1).padStart(2,'0')} / ${pct(s.value,max)}`,12,{'text-anchor':i===data.length-1?'end':'start'}));
    });
-   if(!mirror&&!edgeFade)svg.append(make('line',{x1:50,y1:365,x2:840,y2:365,stroke:color,'stroke-width':strokeWidth}));
+   if(!mirror&&!edgeFade)svg.append(make('line',{x1:50,y1:365,x2:840,y2:365,stroke:color,'stroke-width':strokeWidth,'data-ink-baseline':''}));
   }else if(isometric){
    const stages=isometricStageGeometry(data,{stageHeight,stageGap,tailRatio,isoDepth,isoRotation,borderRadius});
    if(borderRadius){const clips=make('defs');stages.forEach((stage,i)=>{const clip=make('clipPath',{id:`${idPrefix}-stage-clip-${i}`,clipPathUnits:'userSpaceOnUse'});clip.append(make('path',{d:stage.outline}));clips.append(clip);});svg.append(clips);}
