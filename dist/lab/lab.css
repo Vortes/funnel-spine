@@ -16,6 +16,10 @@ aside{background:var(--paper);border-right:.65px dashed var(--ink)}
 .texture-grid button{font-size:13px;min-height:39px;gap:12px;border:0;text-align:left;justify-content:flex-start}
 .texture-grid button[aria-pressed=true]{border:.65px solid var(--ink);background:var(--paper)}
 .texture-grid svg{flex-shrink:0}
+.view-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:24px}
+.view-switch>span{grid-column:1/-1;font:12px ui-monospace,monospace;letter-spacing:.1em}
+.view-switch button{font-size:12px;min-height:38px;padding:8px}
+.view-switch button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
 .figure{padding-top:28px}
 .figure-head h2{font:700 29px/1.15 Arial,Helvetica,sans-serif;letter-spacing:-.8px;margin-top:6px;padding-left:17px;position:relative}
 .figure-head h2:before{content:'';position:absolute;left:0;top:1px;bottom:0;width:4px;background:var(--ink)}

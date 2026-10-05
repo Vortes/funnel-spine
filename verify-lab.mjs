@@ -3,9 +3,14 @@ globalThis.HTMLElement=class {};
 const {variants,createConfig,parseConfig,sampleData}=await import('./dist/lab/config.js');
 const {layoutGraph,renderFunnel,edgeFadeStops,verticalRimGeometry,isometricStageGeometry}=await import('./dist/lab/lab-engine.js');
 for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=g.bottom+1e-8);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
-const vertical=createConfig('vertical');assert.equal(vertical.options.stageGap,4);assert.equal(vertical.options.tailRatio,.6);assert.equal(vertical.options.borderRadius,4);assert.equal(vertical.options.edgeFade,0);
-const isometric=createConfig('isometric');assert.equal(isometric.options.isoDepth,36);assert.equal(isometric.options.isoRotation,30);assert.equal(isometric.options.stageGap,20);assert.deepEqual(isometric.data,vertical.data);
-const presetRims=verticalRimGeometry(vertical.data,vertical.options);assert.equal(presetRims.radii[0],4);assert(presetRims.widths.every((width,i)=>!i||width<=presetRims.widths[i-1]));
+assert.deepEqual(variants,['continuous','vertical','branching']);
+for(const variant of variants)assert.equal(createConfig(variant).options.texture,'mixed');
+const vertical=createConfig('vertical'),isometric=vertical;assert.equal(vertical.options.verticalView,'isometric');assert.equal(vertical.options.stageGap,20);assert.equal(vertical.options.tailRatio,.6);assert.equal(vertical.options.borderRadius,0);assert.equal(vertical.options.edgeFade,0);
+assert.equal(isometric.options.isoDepth,36);assert.equal(isometric.options.isoRotation,30);
+const presetRims=verticalRimGeometry(vertical.data,vertical.options);assert.equal(presetRims.radii[0],0);assert(presetRims.widths.every((width,i)=>!i||width<=presetRims.widths[i-1]));
+const oldVertical=structuredClone(vertical);delete oldVertical.options.verticalView;oldVertical.options.stageGap=4;oldVertical.options.borderRadius=4;assert.equal(parseConfig(oldVertical).options.verticalView,'flat');
+const oldIsometric=structuredClone(vertical);oldIsometric.variant='isometric';delete oldIsometric.options.verticalView;const migratedIsometric=parseConfig(oldIsometric);assert.equal(migratedIsometric.variant,'vertical');assert.equal(migratedIsometric.options.verticalView,'isometric');
+const invalidView=structuredClone(vertical);invalidView.options.verticalView='sideways';assert.throws(()=>parseConfig(invalidView),/vertical view/);
 const previousVertical=structuredClone(vertical);delete previousVertical.options.borderRadius;assert.equal(parseConfig(previousVertical).options.borderRadius,0);
 function verifySeparateRibbons(data,options={}){
  const before=JSON.stringify(data),g=layoutGraph(data,options);assert.equal(JSON.stringify(data),before);assert.equal(g.nodes.length,data.nodes.length);assert.equal(g.nodes.filter(n=>!n.incoming.length).length,1);for(const n of g.nodes){assert(n.incoming.length<=1);if(n.outgoing.length)assert.equal(n.outgoing.reduce((sum,l)=>sum+l.value,0),n.value);}assert.equal(g.nodes.filter(n=>!n.outgoing.length).reduce((sum,n)=>sum+n.value,0),g.total);assert.equal(g.links.length,data.links.length);g.links.forEach((l,i)=>assert.equal(l.value,data.links[i].value));
@@ -66,14 +71,15 @@ for(let i=0;i<projected.length;i++){
 }
 const flat=structuredClone(isometric);flat.data[1].value=flat.data[0].value;assert.throws(()=>parseConfig(flat),/decreasing quantities/);
 const untapered=structuredClone(isometric);untapered.options.tailRatio=1;assert.throws(()=>parseConfig(untapered),/terminal taper/);
-const isoSvg=renderFunnel(isometric.data,{...isometric.options,variant:'isometric'});
+const isoSvg=renderFunnel(isometric.data,{...isometric.options,variant:'vertical'});
 assert.equal(isoSvg.children.filter(child=>child.attrs['data-key']).length,isometric.data.length);
 assert.equal(isoSvg.children.filter(child=>child.attrs['data-stage-face']).length,isometric.data.length*2);
+const flatSvg=renderFunnel(vertical.data,{...vertical.options,variant:'vertical',verticalView:'flat'});assert.equal(flatSvg.children.filter(child=>child.attrs['data-stage-face']).length,0);
 const isoPatternIds=new Set(isoSvg.children.filter(child=>child.tag==='defs').flatMap(defs=>defs.children.map(child=>child.attrs.id)));
 assert(isoSvg.children.filter(child=>child.attrs['data-stage-face']).every(face=>isoPatternIds.has(face.attrs.fill.match(/^url\(#(.+)\)$/)?.[1])));
 assert(isoSvg.children.filter(child=>child.attrs['data-face']==='top').every(face=>face.attrs.fill==='url(#atlas-sparse)'));
 for(const rotation of [-30,30]){
- const options={...isometric.options,isoRotation:rotation,borderRadius:16},geometry=isometricStageGeometry(isometric.data,options),roundedIso=renderFunnel(isometric.data,{...options,variant:'isometric'});
+ const options={...isometric.options,isoRotation:rotation,borderRadius:16},geometry=isometricStageGeometry(isometric.data,options),roundedIso=renderFunnel(isometric.data,{...options,variant:'vertical'});
  assert(geometry.every(stage=>stage.outline.includes('Q')&&!stage.outline.includes('NaN')));
  assert(roundedIso.children.filter(child=>child.attrs['data-key']).every(path=>path.attrs['clip-path']?.startsWith('url(#atlas-stage-clip-')));
  assert.equal(roundedIso.children.filter(child=>child.attrs['data-stage-face']&&child.attrs['clip-path']).length,isometric.data.length*2);
@@ -91,15 +97,15 @@ for(const rotation of [-45,0,30,45]){
 const leftView=isometricStageGeometry(isometric.data,{...isometric.options,isoRotation:-30});
 assert(leftView[0].top.match(/-?\d+(?:\.\d+)?/g).map(Number)[2]<leftView[0].front.match(/-?\d+(?:\.\d+)?/g).map(Number)[0]);
 const invalidRotation=structuredClone(isometric);invalidRotation.options.isoRotation=50;assert.throws(()=>parseConfig(invalidRotation),/isoRotation/);
-const square=renderFunnel(verticalData,{variant:'vertical',borderRadius:0});
-const rounded=renderFunnel(verticalData,{variant:'vertical',borderRadius:20});
+const square=renderFunnel(verticalData,{variant:'vertical',verticalView:'flat',borderRadius:0});
+const rounded=renderFunnel(verticalData,{variant:'vertical',verticalView:'flat',borderRadius:20});
 const ribbons=svg=>svg.children.filter(child=>child.attrs['data-key']);
 assert(ribbons(rounded).every((path,i)=>path.attrs.d!==ribbons(square)[i].attrs.d&&!path.attrs.d.includes('NaN')));
 const rimSpan=path=>{const commands=path.attrs.d.match(/[MLQ][^MLQZ]*/g),numbers=command=>command.match(/-?\d+(?:\.\d+)?/g).map(Number);return {y:numbers(commands[0])[1],top:numbers(commands[1])[2]-numbers(commands[0])[0],bottom:commands.length>4?numbers(commands[4])[2]-numbers(commands[5])[2]:numbers(commands[2])[0]-numbers(commands[3])[2]};};
 for(const seed of [0,1,1234,4294967295])for(const gap of [0,20])for(const radius of [0,20]){
  const data=sampleData('vertical',seed),{widths,radii}=verticalRimGeometry(data,{stageHeight:330,stageGap:gap,tailRatio:.45,borderRadius:radius});
  assert(widths.every((width,i)=>!i||width<=widths[i-1]));
- const spans=ribbons(renderFunnel(data,{variant:'vertical',stageHeight:330,stageGap:gap,capCurve:0,tailRatio:.45,borderRadius:radius})).map(rimSpan);
+ const spans=ribbons(renderFunnel(data,{variant:'vertical',verticalView:'flat',stageHeight:330,stageGap:gap,capCurve:0,tailRatio:.45,borderRadius:radius})).map(rimSpan);
  spans.forEach((span,i)=>{assert(Math.abs(span.top-(widths[i]-2*radii[i]))<1e-8);assert(Math.abs(span.bottom-(widths[i+1]-2*radii[i+1]))<1e-8);if(i){assert(Math.abs(span.y-spans[i-1].y-330/data.length)<1e-8);assert(Math.abs(span.top-spans[i-1].bottom)<1e-8);}});
 }
 for(const variant of variants)for(const type of screenTypes){const config=createConfig(variant);const chart=renderFunnel(config.data,{...config.options,variant,texture:type});assert(ribbons(chart).every(path=>path.attrs.fill===`url(#atlas-${type})`));}

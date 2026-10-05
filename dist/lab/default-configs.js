@@ -5,7 +5,7 @@ export const defaultConfigs={
     "seed": 1234,
     "dataOrigin": "seed",
     "options": {
-      "texture": "dense",
+      "texture": "mixed",
       "density": 3,
       "strokeWidth": 0.5,
       "patternAngle": -45,
@@ -60,7 +60,7 @@ export const defaultConfigs={
     "seed": 1234,
     "dataOrigin": "seed",
     "options": {
-      "texture": "dense",
+      "texture": "mixed",
       "density": 3,
       "strokeWidth": 0.5,
       "patternAngle": -45,
@@ -74,12 +74,15 @@ export const defaultConfigs={
       "chartHeight": 235,
       "edgeFade": 0,
       "stageHeight": 330,
-      "stageGap": 4,
+      "stageGap": 20,
       "capCurve": 0,
-      "borderRadius": 4,
+      "borderRadius": 0,
       "tailRatio": 0.6,
       "nodeGap": 66,
-      "nodeWidth": 2.5
+      "nodeWidth": 2.5,
+      "verticalView": "isometric",
+      "isoDepth": 36,
+      "isoRotation": 30
     },
     "data": [
       {
@@ -115,7 +118,7 @@ export const defaultConfigs={
     "seed": 1234,
     "dataOrigin": "seed",
     "options": {
-      "texture": "dense",
+      "texture": "mixed",
       "density": 3,
       "strokeWidth": 0.4,
       "patternAngle": -25,
@@ -238,9 +241,4 @@ export const defaultConfigs={
       ]
     }
   }
-};
-defaultConfigs.isometric={
-  ...structuredClone(defaultConfigs.vertical),
-  variant:'isometric',
-  options:{...defaultConfigs.vertical.options,stageGap:20,capCurve:0,borderRadius:0,isoDepth:36,isoRotation:30}
 };
