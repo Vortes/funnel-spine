@@ -66,9 +66,6 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 }
 
 .canvas svg{user-select:none;-webkit-user-select:none}
-.figure{container-type:inline-size}
-.canvas[data-variant=branching]{height:calc(max(100cqw,700px) * .511111 + 10px);overflow-y:auto;overscroll-behavior:contain}
-@media(max-width:740px){.canvas[data-variant=branching]{height:470px}}
 
 .figure-actions{display:flex;align-items:center;gap:16px}.figure-actions a{font-size:12px;text-decoration:underline;text-underline-offset:4px}
 @media(max-width:740px){.figure-head{flex-wrap:wrap;gap:12px}.figure-actions{flex-wrap:wrap;gap:12px}}
