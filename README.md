@@ -13,13 +13,13 @@ npm ci
 npm run dev
 ```
 
-Open [the lab](http://127.0.0.1:8000/lab/) for the active workshop. The [original kit](http://127.0.0.1:8000/) remains available for comparison. Edits in `dist/` refresh the browser automatically. For another port, use `PORT=4173 npm run dev`.
+Open [the lab](http://127.0.0.1:8000/lab/) for the active workshop and [the particle study](http://127.0.0.1:8000/lab/vertical-particles/) for its vertical flow experiment. The [original kit](http://127.0.0.1:8000/) remains available for comparison. `npm run dev` builds both React pages, watches `src/lab/`, and refreshes the browser when the generated files in `dist/` change. Run `npm run build:lab` to regenerate those files without starting the server. For another port, use `PORT=4173 npm run dev`.
 
 ```sh
 npm run check
 ```
 
-The checks cover data and option validation, seeded print screens, connected branching geometry and conservation, configuration migration, the React DOM and server import, package types, and the vertical particle study.
+The checks cover data and option validation, seeded print screens, connected branching geometry and conservation, configuration migration, the React package DOM and server import, package types, and both React lab pages.
 
 ## React integration
 
@@ -53,9 +53,11 @@ The component accepts standard `div` props and a `ref` to its container. It supp
 | Path | Role |
 | --- | --- |
 | `dist/react/` | React component and public TypeScript declaration |
+| `src/lab/` | React source for the workshop and particle study |
+| `scripts/build-lab.mjs` | Builds the two lab entry points into `dist/lab/` |
 | `dist/core/data.js` | Shared data validation |
 | `dist/lab/lab-engine.js`, `screens.js`, `options.js` | Package renderer and print rules |
-| `dist/lab/` | Active design workshop and saved-config format |
+| `dist/lab/` | Lab pages, generated UI bundles, renderer, and saved-config format |
 | `dist/atlas-kit.js`, `dist/atlas-kit-react.tsx`, `dist/index.html` | Legacy kit and its original API |
 | `verify*.mjs`, `types.test.tsx` | Runtime and type checks |
 

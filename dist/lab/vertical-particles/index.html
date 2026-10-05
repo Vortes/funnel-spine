@@ -1,7 +1,13 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vertical particles / Atlas lab</title><link rel="stylesheet" href="study.css"></head>
-<body><header><a href="/lab/">atlas-kit / lab</a><span>PARTICLE STUDY 01</span></header>
-<main><div class="heading"><div><h1>Vertical transfer</h1><p>Tune the small flow between containers.</p></div><div class="actions"><button id="pause" aria-pressed="false">Pause</button><button id="save">Save configuration</button></div></div>
-<div class="workspace"><aside aria-label="Particle controls"><h2>Particles</h2><div id="particle-controls"></div><h2>Containers</h2><div id="container-controls"></div><label class="toggle" for="labels">Stage annotations<input id="labels" type="checkbox"></label><button id="reset">Reset study</button><div class="file-actions"><button id="export">Download JSON</button><button id="import">Import JSON</button><input id="file" type="file" accept="application/json,.json" hidden></div><p id="motion-note">Staggered, accelerating falls. Pausing freezes the current frame.</p><p id="status" role="status" aria-live="polite"></p></aside>
-<section class="study-preview" aria-label="Live preview"><figure><figcaption><span>01 / LIVE STUDY</span><span id="summary"></span></figcaption><div id="preview" data-paused="false"></div><p class="caption">Dots illustrate transfer; quantities remain encoded by the containers.</p></figure></section></div>
-</main><script type="module" src="study.js"></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Vertical particles / Atlas lab</title>
+  <link rel="stylesheet" href="study.css">
+</head>
+<body>
+  <div id="particle-root"></div>
+  <script type="module" src="study.js"></script>
+</body>
+</html>

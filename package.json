@@ -29,13 +29,15 @@
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "check": "node verify.mjs && node verify-lab.mjs && node verify-particles.mjs && node verify-react.mjs && npm run typecheck",
+    "build:lab": "node scripts/build-lab.mjs",
+    "check": "npm run build:lab && node verify.mjs && node verify-lab.mjs && node verify-particles.mjs && node verify-react.mjs && node verify-lab-ui.mjs && npm run typecheck",
     "typecheck": "tsc --noEmit",
     "test": "npm run check"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.25.12",
     "jsdom": "^26.1.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

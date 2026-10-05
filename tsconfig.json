@@ -6,7 +6,8 @@
     "jsx": "react-jsx",
     "strict": true,
     "noEmit": true,
+    "allowJs": true,
     "types": ["react"]
   },
-  "include": ["types.test.tsx"]
+  "include": ["types.test.tsx", "src/lab/**/*.ts", "src/lab/**/*.tsx"]
 }

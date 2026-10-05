@@ -5,10 +5,12 @@ import {parseStudy} from '../dist/lab/vertical-particles/study-config.js';
 import {watch} from 'node:fs';
 import {dirname, extname, resolve, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {watchLab} from './build-lab.mjs';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)), '../dist');
 const port=Number(process.env.PORT || 8000);
 if(!Number.isInteger(port)||port<1||port>65535)throw new Error('PORT must be an integer from 1 to 65535.');
+const labBuilder=await watchLab();
 const clients=new Set();
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpeg':'image/jpeg','.jpg':'image/jpeg','.zip':'application/zip','.md':'text/plain; charset=utf-8','.tsx':'text/plain; charset=utf-8','.ts':'text/plain; charset=utf-8'};
 const refresh='<script>const updates=new EventSource("/__dev/events");updates.addEventListener("reload",()=>location.reload());</script>';
@@ -89,8 +91,9 @@ const heartbeat=setInterval(()=>{for(const client of clients)client.write(': hea
 server.on('error',error=>{
   console.error(error.code==='EADDRINUSE'?`Port ${port} is busy. Stop the other server or use PORT=4173 npm run dev.`:error.message);
   watcher.close();clearInterval(heartbeat);process.exitCode=1;
+  void labBuilder.dispose();
 });
 server.listen(port,'127.0.0.1',()=>console.log(`Funnel Spine\nKit: http://127.0.0.1:${port}/\nLab: http://127.0.0.1:${port}/lab/\nChanges in dist/ refresh the browser automatically.`));
-function shutdown(){watcher.close();clearTimeout(pending);clearInterval(heartbeat);for(const client of clients)client.end();server.close();}
+function shutdown(){watcher.close();clearTimeout(pending);clearInterval(heartbeat);for(const client of clients)client.end();server.close();void labBuilder.dispose();}
 process.on('SIGINT',shutdown);
 process.on('SIGTERM',shutdown);

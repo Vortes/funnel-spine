@@ -1,0 +1,199 @@
+import { createRoot } from 'react-dom/client';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { validateData } from '../../dist/core/data.js';
+import { layoutGraph, renderFunnel } from '../../dist/lab/lab-engine.js';
+import { createConfig, parseConfig, sampleData } from '../../dist/lab/config.js';
+import { PrintSettings } from './Controls';
+import { Details, type DetailView } from './Details';
+import { FigurePanel } from './Figure';
+import { download } from './utils';
+import type { LabConfig, LabOptions, LabSvg, PathInfo, SavedConfig, Variant } from './types';
+
+const variants: Variant[] = ['continuous', 'vertical', 'branching'];
+const titles: Record<Variant, string> = { continuous: 'Continuous funnel', vertical: 'Vertical funnel', branching: 'Branching funnel' };
+const storageKey = 'atlas-funnel-lab-configs-v1';
+
+function loadSaved(): { items: SavedConfig[]; available: boolean } {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const items = Array.isArray(raw) ? raw.flatMap(item => {
+      try { return typeof item?.name === 'string' ? [{ name: item.name, config: parseConfig(item.config) as LabConfig }] : []; }
+      catch { return []; }
+    }) : [];
+    return { items, available: true };
+  } catch {
+    return { items: [], available: false };
+  }
+}
+
+function App() {
+  const [configs, setConfigs] = useState<Record<Variant, LabConfig>>(() => Object.fromEntries(variants.map(variant => [variant, createConfig(variant)])) as Record<Variant, LabConfig>);
+  const [variant, setVariant] = useState<Variant>('continuous');
+  const [view, setView] = useState<DetailView>('config');
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [inspected, setInspected] = useState<PathInfo | null>(null);
+  const [infos, setInfos] = useState<PathInfo[]>([]);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const [dataDraft, setDataDraft] = useState(() => JSON.stringify(createConfig('continuous').data, null, 2));
+  const [dataError, setDataError] = useState('');
+  const [seedDraft, setSeedDraft] = useState(() => String(createConfig('continuous').seed));
+  const [saved, setSaved] = useState(loadSaved);
+  const [configName, setConfigName] = useState('');
+  const [notice, setNotice] = useState<{ text: string; id: number } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const svgRef = useRef<LabSvg>(null);
+  const config = configs[variant];
+
+  const showNotice = useCallback((text: string) => setNotice({ text, id: Date.now() + Math.random() }), []);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  const select = useCallback((key: string | null) => setSelectedKey(key), []);
+  const inspect = useCallback((info: PathInfo | null) => setInspected(info), []);
+  const pathsChanged = useCallback((next: PathInfo[]) => setInfos(next), []);
+  const renderFailed = useCallback((error: string | null) => setRenderError(error), []);
+
+  function switchVariant(next: Variant) {
+    setVariant(next);
+    setSelectedKey(null);
+    setInspected(null);
+    setInfos([]);
+    setDataError('');
+    setDataDraft(JSON.stringify(configs[next].data, null, 2));
+    setSeedDraft(String(configs[next].seed));
+  }
+
+  function replaceConfig(next: LabConfig) {
+    setConfigs(current => ({ ...current, [next.variant]: next }));
+    setVariant(next.variant);
+    setSelectedKey(null);
+    setInspected(null);
+    setInfos([]);
+    setDataError('');
+    setDataDraft(JSON.stringify(next.data, null, 2));
+    setSeedDraft(String(next.seed));
+  }
+
+  function updateOption(key: keyof LabOptions, value: number | boolean | string) {
+    setConfigs(current => ({
+      ...current,
+      [variant]: { ...current[variant], options: { ...current[variant].options, [key]: value } as LabOptions },
+    }));
+  }
+
+  function sample(seed: number) {
+    const next: LabConfig = { ...config, seed, data: sampleData(variant, seed), dataOrigin: 'seed' };
+    replaceConfig(next);
+  }
+
+  function commitSeed() {
+    const seed = Number(seedDraft);
+    if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295 || seedDraft.trim() === '') {
+      showNotice('Use a seed between 0 and 4294967295');
+      setSeedDraft(String(config.seed));
+      return;
+    }
+    if (seed !== config.seed) sample(seed);
+  }
+
+  function applyData() {
+    try {
+      const data: unknown = JSON.parse(dataDraft);
+      validateData(data, variant);
+      if (variant === 'branching') layoutGraph(data, config.options);
+      setConfigs(current => ({ ...current, [variant]: { ...current[variant], data, dataOrigin: 'custom' } }));
+      setSelectedKey(null);
+      setInspected(null);
+      setDataError('');
+      showNotice('Data applied');
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function save() {
+    try {
+      const snapshot = parseConfig(config) as LabConfig;
+      const name = configName.trim() || `${titles[variant]} ${saved.items.length + 1}`;
+      const items = [{ name, config: snapshot }, ...saved.items];
+      setSaved(current => ({ ...current, items }));
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(items));
+        showNotice(`Saved ${name}`);
+      } catch {
+        setSaved({ items, available: false });
+        showNotice('Saved for this session. Export JSON to keep it.');
+      }
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function exportSvg() {
+    const clone = renderFunnel(config.data, { ...config.options, variant, idPrefix: 'lab-export', seed: config.seed, stippleScale: 3 }) as SVGSVGElement;
+    clone.querySelectorAll('[data-key]').forEach(path => {
+      path.removeAttribute('tabindex');
+      path.removeAttribute('role');
+      path.removeAttribute('aria-pressed');
+      path.setAttribute('fill', path.getAttribute('data-base-fill')!);
+      path.removeAttribute('stroke-dasharray');
+      path.removeAttribute('data-base-fill');
+    });
+    clone.setAttribute('width', clone.getAttribute('viewBox')!.split(' ')[2]);
+    clone.setAttribute('height', clone.getAttribute('viewBox')!.split(' ')[3]);
+    download(new XMLSerializer().serializeToString(clone), `atlas-lab-${variant}.svg`, 'image/svg+xml');
+  }
+
+  async function importConfig(file: File | undefined) {
+    if (!file) return;
+    try {
+      if (file.size > 1000000) throw new Error('Choose a configuration smaller than 1 MB.');
+      const next = parseConfig(JSON.parse(await file.text())) as LabConfig;
+      replaceConfig(next);
+      showNotice('Configuration imported');
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(view === 'data' ? dataDraft : JSON.stringify(config, null, 2));
+      showNotice('JSON copied');
+    } catch {
+      showNotice('Copy unavailable. Use Export config to download JSON.');
+    }
+  }
+
+  return <>
+    <a href="#canvas" className="skip">Skip to figure</a>
+    <header><a className="brand" href="/">atlas-kit <span>/ lab</span></a><p>RISOGRAPH STUDIES <span>01—03</span></p><a className="back" href="/">Back to the kit</a></header>
+    <main><div className="lab-title"><div><h1>Funnel studies</h1><p>One blue ink. Three ways to read conversion.</p></div><div className="actions">
+      <button id="import" onClick={() => fileRef.current?.click()}>Import config</button>
+      <input id="import-file" ref={fileRef} type="file" accept="application/json,.json" hidden onChange={event => void importConfig(event.target.files?.[0])} />
+      <button id="download" onClick={() => download(JSON.stringify(config, null, 2), `atlas-lab-${variant}-${config.seed}.json`, 'application/json')}>Export config</button>
+      <button id="save" className="primary" disabled={Boolean(renderError)} onClick={save}>Save configuration</button>
+    </div></div>
+      <div className="variant-bar" role="group" aria-label="Funnel variant">{variants.map((item, index) => <button key={item} data-variant={item} aria-pressed={variant === item} onClick={() => switchVariant(item)}><span>0{index + 1}</span> {item[0].toUpperCase() + item.slice(1)}</button>)}<span className="variant-note">Each variant keeps its own settings.</span></div>
+      <div className="workspace">
+        <PrintSettings variant={variant} options={config.options} seed={config.seed} seedDraft={seedDraft} onOptionChange={updateOption} onSeedDraft={setSeedDraft} onSeedCommit={commitSeed} onSample={() => sample(crypto.getRandomValues(new Uint32Array(1))[0])} onReset={() => { replaceConfig(createConfig(variant) as LabConfig); showNotice('Variant reset'); }} />
+        <div className="working-area">
+          <FigurePanel config={config} selectedKey={selectedKey} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onSelect={select} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
+          <Details config={config} view={view} dataDraft={dataDraft} dataError={dataError} infos={infos} onView={next => { setView(next); if (next === 'data') setDataDraft(JSON.stringify(config.data, null, 2)); }} onDataDraft={setDataDraft} onApplyData={applyData} onRestoreData={() => sample(config.seed)} onSelectRow={key => { setSelectedKey(current => current === key ? null : key); setInspected(infos.find(info => info.key === key) ?? null); }} onCopy={() => void copy()} />
+        </div>
+      </div>
+      <section className="saved"><div className="saved-heading"><div><span className="overline">YOUR DIRECTIONS</span><h2>Saved configurations</h2></div><label htmlFor="config-name">Name this configuration <input id="config-name" value={configName} onChange={event => setConfigName(event.target.value)} placeholder="e.g. Fine hatch, wide spacing" maxLength={80} /></label></div>
+        <div id="saved-list" className="saved-list">{saved.items.length ? saved.items.map((item, index) => <button className="saved-card" key={`${item.name}-${index}`} onClick={() => { replaceConfig(parseConfig(item.config) as LabConfig); setConfigName(item.name); showNotice(`Restored ${item.name}`); }}><strong>{item.name}</strong><span>{titles[item.config.variant]}</span><span>{item.config.options.texture} / seed {item.config.seed}</span></button>) : <p className="empty">Save a configuration to compare and return to it.</p>}</div>
+        <p className="storage-note">{saved.available ? 'Saved in this browser. Export JSON to keep a portable copy.' : 'Browser storage unavailable. Export JSON to keep a portable copy.'}</p>
+      </section>
+    </main>
+    {notice && <div id="status" role="status" className="status">{notice.text}</div>}
+  </>;
+}
+
+createRoot(document.getElementById('lab-root')!).render(<App />);

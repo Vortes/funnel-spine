@@ -10,4 +10,4 @@ Before a developer launch, decide and verify these points:
 4. **Performance:** record mount and update costs for large funnels and several charts on one page. The lab's `/lab/benchmark.html` compares shader and vector stipple but is not a consumer app benchmark.
 5. **Public docs and examples:** replace the legacy kit page's React snippet and downloadable ZIP when the package API is final. Publish a plain Markdown API reference and copyable examples for agents alongside the chosen distribution method.
 
-The current lab remains the visual source of truth. Its branching invariant is one connected bucket tree with 100% split conservation. The English-only design uses one blue ink, cool gray paper, and screened fills.
+Both lab pages now use React components in `src/lab/` and share the package renderer; their UI bundles are generated for the local server and excluded from the package. The lab remains the visual source of truth. Its branching invariant is one connected bucket tree with 100% split conservation. The English-only design uses one blue ink, cool gray paper, and screened fills.
