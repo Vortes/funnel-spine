@@ -20,7 +20,7 @@ export const defaultStudy={
       "curve": 0.5,
       "chartHeight": 235,
       "stageHeight": 330,
-      "stageGap": 16,
+      "stageGap": 14,
       "capCurve": 0,
       "tailRatio": 0.45,
       "nodeGap": 66,
@@ -55,10 +55,10 @@ export const defaultStudy={
     ]
   },
   "particles": {
-    "size": 0.5,
-    "count": 48,
-    "duration": 1200,
-    "drift": 1.5,
-    "edgeAngle": 0
+    "size": 0.6,
+    "count": 124,
+    "duration": 540,
+    "drift": 0,
+    "edgeAngle": 58
   }
 };
