@@ -70,7 +70,7 @@ function printEntrance(chart,kind){
    node.atlasEmphasis?.setAttribute('clip-path',`url(#${id})`);
   }
  }else if(kind==='continuous'){
-  ribbons.forEach(path=>mark(path,0));
+  ribbons.forEach((path,i)=>mark(path,i));
  }else{
   ribbons.forEach((path,i)=>mark(path,i));
   const steps=new Map(ribbons.map((path,i)=>[path.dataset.key,i]));
