@@ -68,4 +68,8 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 .fade-preview{height:14px;margin-top:7px;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 5px);pointer-events:none;user-select:none}
 .control--fade input[type=range]{height:40px}
 .fade-hint{display:block;margin-top:7px;font:11px/1.4 ui-monospace,monospace;color:var(--muted)}
-@media(min-width:741px){.workspace>aside{align-self:start;position:sticky;top:16px;height:min(900px,calc(100dvh - 265px));min-height:320px;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}}
+@media(min-width:741px){
+ .workspace>aside{align-self:stretch;min-height:0;padding:0}
+ .sidebar-scroll{position:sticky;top:16px;height:min(900px,calc(100dvh - 265px));min-height:320px;padding:24px 22px;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
+}
+@media(min-width:741px) and (max-width:1050px){.sidebar-scroll{padding:22px 16px}}
