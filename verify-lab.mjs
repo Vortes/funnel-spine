@@ -83,7 +83,9 @@ for(const rotation of [-30,30]){
  assert(geometry.every(stage=>stage.outline.includes('Q')&&!stage.outline.includes('NaN')));
  assert(roundedIso.children.filter(child=>child.attrs['data-key']).every(path=>path.attrs['clip-path']?.startsWith('url(#atlas-stage-clip-')));
  assert.equal(roundedIso.children.filter(child=>child.attrs['data-stage-face']&&child.attrs['clip-path']).length,isometric.data.length*2);
+ const outlines=roundedIso.children.filter(child=>child.attrs['data-stage-outline']);assert.equal(outlines.length,geometry.length);outlines.forEach((outline,i)=>{assert.equal(outline.attrs.d,geometry[i].outline);assert.equal(outline.attrs.fill,'none');assert.equal(outline.attrs['pointer-events'],'none');assert(!outline.attrs['clip-path']);});
 }
+assert.equal(isoSvg.children.filter(child=>child.attrs['data-stage-outline']).length,0);
 for(const rotation of [-45,0,30,45]){
  const stages=isometricStageGeometry(isometric.data,{...isometric.options,isoRotation:rotation});
  const expectedShift=isometric.options.isoDepth*Math.sin(rotation*Math.PI/180)/.5;
