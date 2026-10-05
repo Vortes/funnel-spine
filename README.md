@@ -1,42 +1,64 @@
 # Funnel Spine / Atlas kit
 
-A local workshop for continuous, vertical, and branching conversion charts. The kit page lives at `/`; the risograph lab lives at `/lab/`.
+Funnel Spine is a local workshop for continuous, vertical, and branching conversion charts. The intended developer API is now React first. The package entry uses the same renderer as the active risograph lab; the original kit page remains a legacy playground.
+
+**Status:** this is an unpublished package candidate. `private: true` prevents accidental publication. The package name and install method are not final.
 
 ## Local development
 
-Use Node.js 22 or later. No dependency installation or build step is needed.
+Use Node.js 22 or later.
 
 ```sh
-cd /Users/alan/Programming/funnel-spine
+npm ci
 npm run dev
 ```
 
-Open **http://127.0.0.1:8000/lab/**. Edits in `dist/` refresh the browser automatically. The server binds to your computer's loopback interface and disables caching. For another port, use `PORT=4173 npm run dev`.
+Open [the lab](http://127.0.0.1:8000/lab/) for the active workshop. The [original kit](http://127.0.0.1:8000/) remains available for comparison. Edits in `dist/` refresh the browser automatically. For another port, use `PORT=4173 npm run dev`.
 
 ```sh
 npm run check
 ```
 
-The checks cover data validation, proportional geometry, configuration migration, seeded screens, and connected branching layouts with 100% conservation and no overlaps.
+The checks cover data and option validation, seeded print screens, connected branching geometry and conservation, configuration migration, the React DOM and server import, package types, and the vertical particle study.
 
-## Vertical particle study
+## React integration
 
-Open **http://127.0.0.1:8000/lab/vertical-particles/** to tune falling dots between the vertical funnel containers. Save configuration writes `designs/vertical-particles/latest.json` into this repository; Download JSON and Import JSON provide portable copies. See [particle study documentation](dist/lab/vertical-particles/README.md).
+The local package exposes `AtlasFunnel` from `funnel-spine`. It requires the consumer's React 18.3 or 19 installation and has no Tailwind or shadcn requirement. Until publication, use a local tarball from `npm pack` to test it in another project:
 
-## Project layout
+```sh
+npm pack
+# In the consumer project:
+npm install /absolute/path/to/funnel-spine-0.1.0.tgz
+```
 
-- `dist/lab/`: the active lab, renderer, screen definitions, configuration handling, and approved defaults.
-- `dist/index.html`, `dist/app.js`, `dist/style.css`: the original kit playground.
-- `dist/atlas-kit.js`, `dist/atlas-kit.d.ts`, `dist/atlas-kit-react.tsx`: the original library and optional React adapter.
-- `scripts/dev.mjs`: dependency-free local server and browser refresh.
-- `verify.mjs`, `verify-lab.mjs`: core and lab checks.
+```tsx
+'use client';
+import { AtlasFunnel } from 'funnel-spine';
 
-All three lab variants start from the approved seed-1234 configurations. Reset variant restores its full preset. Configurations saved in the browser are scoped to the local origin; import an exported JSON to bring a hosted configuration into the local lab.
+const stages = [
+  { id: 'visits', label: 'Visits', value: 12000 },
+  { id: 'signups', label: 'Signups', value: 3600 },
+  { id: 'active', label: 'Active', value: 2160 },
+];
 
-The lab renderer includes newer screen and branching behavior than the original library. See [lab documentation](dist/lab/README.md) and [library documentation](dist/README.md) for their respective APIs.
+export function ConversionChart() {
+  return <AtlasFunnel data={stages} options={{ texture: 'dense' }} />;
+}
+```
 
-Work locally by default. Publish or deploy only when explicitly requested. The local repo has no Sites hosting manifest or automatic publication step.
+The component accepts standard `div` props and a `ref` to its container. It supports `onInspect`, `onSelectionChange`, and controlled or uncontrolled selection. See [the integration contract](docs/react-integration.md) for branching data, lab config reuse, options, and behavior.
 
-## History
+## Source map
 
-The migration replaces the previous implementation and keeps its MIT license. Work from the Atlas kit session is grouped into descriptive commits; see [migration history](docs/history.md).
+| Path | Role |
+| --- | --- |
+| `dist/react/` | React component and public TypeScript declaration |
+| `dist/core/data.js` | Shared data validation |
+| `dist/lab/lab-engine.js`, `screens.js`, `options.js` | Package renderer and print rules |
+| `dist/lab/` | Active design workshop and saved-config format |
+| `dist/atlas-kit.js`, `dist/atlas-kit-react.tsx`, `dist/index.html` | Legacy kit and its original API |
+| `verify*.mjs`, `types.test.tsx` | Runtime and type checks |
+
+The current package is source distributed: `npm pack --dry-run` lists the exact files. The legacy kit and its source ZIP are outside that package. The lab's single blue ink, cool gray paper, and screened fills are intentional defaults.
+
+Work locally by default. Do not publish or synchronize with Sites unless explicitly requested. See [launch readiness](docs/launch-readiness.md) for the remaining release decisions and verification work.

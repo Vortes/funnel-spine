@@ -4,12 +4,41 @@
   "private": true,
   "type": "module",
   "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/react/atlas-funnel.d.ts",
+      "default": "./dist/react/atlas-funnel.js"
+    }
+  },
+  "files": [
+    "dist/core/data.js",
+    "dist/lab/lab-engine.js",
+    "dist/lab/options.js",
+    "dist/lab/screens.js",
+    "dist/lab/stipple-shader.js",
+    "dist/react/atlas-funnel.js",
+    "dist/react/atlas-funnel.d.ts",
+    "docs/react-integration.md",
+    "docs/launch-readiness.md"
+  ],
+  "peerDependencies": {
+    "react": "^18.3.0 || ^19.0.0"
+  },
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "check": "node verify.mjs && node verify-lab.mjs && node verify-particles.mjs",
+    "check": "node verify.mjs && node verify-lab.mjs && node verify-particles.mjs && node verify-react.mjs && npm run typecheck",
+    "typecheck": "tsc --noEmit",
     "test": "npm run check"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^26.1.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^5.9.3"
   }
 }

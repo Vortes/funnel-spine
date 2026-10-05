@@ -1,4 +1,4 @@
-import { validateData } from '../atlas-kit.js';
+import { validateData } from '../core/data.js';
 import { INK, PAPER, screenDefs, screenOrder } from './screens.js';
 const NS = 'http://www.w3.org/2000/svg';
 const make = (tag, attrs = {}, text) => { const el = document.createElementNS(NS, tag); for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v)); if(text !== undefined) el.textContent=text; return el; };
@@ -7,7 +7,7 @@ const pct = (n,d) => d ? `${(100*n/d).toFixed(1)}%` : '—';
 export function layoutGraph(data,{nodeGap=66,nodeWidth=2.5}={}) {
  validateData(data,'branching');
  const nodes=data.nodes.map(n=>({...n,incoming:[],outgoing:[],level:0})),map=new Map(nodes.map(n=>[n.id,n]));
- const links=data.links.map((l,i)=>({...l,id:`link-${i}`,sourceNode:map.get(l.source),targetNode:map.get(l.target)}));
+ const links=data.links.map(l=>({...l,id:`link:${encodeURIComponent(l.source)}:${encodeURIComponent(l.target)}`,sourceNode:map.get(l.source),targetNode:map.get(l.target)}));
  links.forEach(l=>{l.sourceNode.outgoing.push(l);l.targetNode.incoming.push(l);});
  const roots=nodes.filter(n=>!n.incoming.length);
  if(roots.length!==1)throw new Error('Use one entry bucket for a branching funnel.');

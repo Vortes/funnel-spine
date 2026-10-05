@@ -1,21 +1,11 @@
+import { validateData } from './core/data.js';
+export { validateData } from './core/data.js';
 const NS = 'http://www.w3.org/2000/svg';
 const make = (tag, attrs = {}, text) => { const el = document.createElementNS(NS, tag); for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v)); if(text !== undefined) el.textContent=text; return el; };
 const fmt = n => new Intl.NumberFormat('en-US').format(n);
 const pct = (n,d) => d ? `${(100*n/d).toFixed(1)}%` : '—';
 export const stages = [{id:'visits',label:'Visitors',value:12000},{id:'engaged',label:'Engaged',value:7200},{id:'signup',label:'Signups',value:3600},{id:'activated',label:'Activated',value:2160},{id:'converted',label:'Converted',value:1080}];
 export const graph = {nodes:[{id:'visitors',label:'Visitors'},{id:'organic',label:'Organic'},{id:'paid',label:'Paid'},{id:'signup',label:'Signups'},{id:'exit',label:'Drop-off'},{id:'active',label:'Activated'},{id:'inactive',label:'Inactive'}],links:[{source:'visitors',target:'organic',value:7200},{source:'visitors',target:'paid',value:4800},{source:'organic',target:'signup',value:2160},{source:'organic',target:'exit',value:5040},{source:'paid',target:'signup',value:1440},{source:'paid',target:'exit',value:3360},{source:'signup',target:'active',value:2160},{source:'signup',target:'inactive',value:1440}]};
-export function validateData(data,variant='continuous') {
- if(variant !== 'branching') {
-  if(!Array.isArray(data)||data.length<2) throw new Error('Provide at least two stages.');
-  const ids=new Set(); data.forEach((s,i)=>{if(!s.id||typeof s.label!=='string'||ids.has(s.id))throw new Error('Every stage needs a unique id and a label.');ids.add(s.id);if(!Number.isFinite(s.value)||s.value<0)throw new Error('Stage values must be finite and nonnegative.');if(i && s.value>data[i-1].value)throw new Error('Conversion stages cannot increase in value.');});return data;
- }
- if(!data||!Array.isArray(data.nodes)||!Array.isArray(data.links)||data.nodes.length<2||!data.links.length)throw new Error('Provide nodes and links for a branching funnel.');
- const ids=new Set(); data.nodes.forEach(n=>{if(!n.id||typeof n.label!=='string'||ids.has(n.id))throw new Error('Every node needs a unique id and a label.');ids.add(n.id);});
- const ins=new Map(data.nodes.map(n=>[n.id,0])), outs=new Map(ins), edges=new Set();
- data.links.forEach(l=>{if(!ids.has(l.source)||!ids.has(l.target)||l.source===l.target)throw new Error('Links must connect two distinct existing nodes.');if(!Number.isFinite(l.value)||l.value<=0)throw new Error('Link quantities must be positive finite numbers.');const key=JSON.stringify([l.source,l.target]);if(edges.has(key))throw new Error('Combine duplicate source/target links.');edges.add(key);ins.set(l.target,ins.get(l.target)+l.value);outs.set(l.source,outs.get(l.source)+l.value);});
- for(const n of data.nodes){if(!ins.get(n.id)&&!outs.get(n.id))throw new Error('Every node must be connected.');if(ins.get(n.id)&&outs.get(n.id)>ins.get(n.id)+1e-8)throw new Error(`Outgoing flow exceeds incoming flow at ${n.label}.`);}
- const pending=new Set(ids), done=new Set();while(pending.size){const ready=[...pending].filter(id=>data.links.filter(l=>l.target===id).every(l=>done.has(l.source)));if(!ready.length)throw new Error('Branching funnels must be acyclic.');ready.forEach(id=>{done.add(id);pending.delete(id);});}return data;
-}
 export function layoutGraph(data) {
  validateData(data,'branching'); const nodes=data.nodes.map(n=>({...n,incoming:[],outgoing:[],level:0}));const map=new Map(nodes.map(n=>[n.id,n]));const links=data.links.map((l,i)=>({...l,id:`link-${i}`,sourceNode:map.get(l.source),targetNode:map.get(l.target)}));links.forEach(l=>{l.sourceNode.outgoing.push(l);l.targetNode.incoming.push(l);});
  let pending=[...nodes];const done=new Set();while(pending.length){const ready=pending.filter(n=>n.incoming.every(l=>done.has(l.source)));ready.forEach(n=>{n.level=n.incoming.length?Math.max(...n.incoming.map(l=>l.sourceNode.level))+1:0;n.value=Math.max(n.incoming.reduce((s,l)=>s+l.value,0),n.outgoing.reduce((s,l)=>s+l.value,0));done.add(n.id);});pending=pending.filter(n=>!done.has(n.id));}

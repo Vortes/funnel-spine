@@ -1,12 +1,12 @@
 # atlas-kit
 
-Three interactive funnel components with scientific atlas linework. Browser-native SVG, no rendering dependencies, optional React adapter, and TypeScript declarations.
+Legacy kit page and browser-native SVG library. The React-first package entry now lives in `dist/react/` and uses the lab renderer; see the repository root README for new integrations.
 
 ## Files
 
-- `atlas-kit.js`: browser ES module, custom element, renderer, validation, and layout.
+- `atlas-kit.js`: browser ES module, custom element, renderer, and layout. It imports `core/data.js` for validation.
 - `atlas-kit.d.ts`: TypeScript declarations.
-- `atlas-kit-react.tsx`: React client adapter. Copy all three files into the same folder.
+- `atlas-kit-react.tsx`: React client adapter. Copy these three files plus `core/data.js`, preserving the `core/` folder.
 
 This is a source distribution. No npm package has been published.
 

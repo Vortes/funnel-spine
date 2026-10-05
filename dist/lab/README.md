@@ -10,7 +10,7 @@ Each variant has independent settings. Shared controls adjust the starting scree
 
 Save configuration retains a named copy in browser storage. Select it from the shelf to restore it. Export config downloads the full JSON; Import config restores that JSON with validation. Export SVG includes every ribbon, even when a path is pinned, and excludes interaction overlays. The shader screens are embedded as 3× PNGs in the SVG; the lab preview uses 2× screens. Other geometry remains vector. Mouse hover settles a thin contour over the selected section and its connected path in 150 ms; leaving takes 110 ms. The filled geometry and hit area remain stationary. Keyboard and touch feedback is immediate, and reduced-motion preferences disable all transitions.
 
-Extended lab geometry options are experimental and do not yet apply to the main React component. To render a lab config programmatically in the browser:
+The new React package entry uses this renderer and accepts the lab geometry options. The original kit page and its legacy React adapter still use the older renderer. To render a lab config programmatically in the browser:
 
 ```js
 import { renderFunnel } from './lab-engine.js';

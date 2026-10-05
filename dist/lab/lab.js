@@ -1,5 +1,5 @@
 import {renderFunnel,layoutGraph,edgeFadeStops} from './lab-engine.js';
-import {validateData} from '../atlas-kit.js';
+import {validateData} from '../core/data.js';
 import {INK,PAPER,element,screenSwatch,screenLabels,screenTypes} from './screens.js';
 import {variants,createConfig,parseConfig,sampleData} from './config.js';
 const $=s=>document.querySelector(s),format=n=>new Intl.NumberFormat('en-US').format(n),percent=(v,d)=>d?`${(100*v/d).toFixed(1)}%`:'—';
