@@ -1,15 +1,18 @@
 import {renderFunnel} from '../lab-engine.js';
 import {createStudy,parseStudy} from './study-config.js';
 import {addParticles,particleGaps} from './particles.js';
+import {roundContainers} from './containers.js';
+import {animateTransfer} from './motion.js';
 
 const $=selector=>document.querySelector(selector),preview=$('#preview');
-let study=createStudy(),svg,paused=false,offscreen=false,edited=false;
+let study=createStudy(),svg,motion,paused=false,offscreen=false,edited=false;
 const reduce=matchMedia('(prefers-reduced-motion: reduce)');
 function status(text,error=false){$('#status').textContent=text;$('#status').dataset.error=String(error);}
-function playback(){preview.dataset.paused=String(paused||offscreen||document.hidden||reduce.matches);$('#pause').disabled=reduce.matches;$('#pause').textContent=paused?'Resume':'Pause';$('#pause').setAttribute('aria-pressed',String(paused));$('#motion-note').textContent=reduce.matches?'Reduced motion is on. Particles are shown as still dots.':'Staggered, accelerating falls. Pausing freezes the current frame.';}
+function playback(){motion?.setReducedMotion(reduce.matches);motion?.setPaused(paused||offscreen||document.hidden||reduce.matches);preview.dataset.paused=String(paused||offscreen||document.hidden||reduce.matches);$('#pause').disabled=reduce.matches;$('#pause').textContent=paused?'Resume':'Pause';$('#pause').setAttribute('aria-pressed',String(paused));$('#motion-note').textContent=reduce.matches?'Reduced motion is on. Particles are shown as still dots.':'Condense, release, absorb. Pause freezes the whole transfer cycle.';}
 function render(rebuild=true){
-  if(rebuild){svg=renderFunnel(study.funnel.data,{...study.funnel.options,variant:'vertical',seed:study.funnel.seed,idPrefix:'particle-study'});svg.querySelectorAll('[data-key]').forEach(path=>{path.removeAttribute('tabindex');path.removeAttribute('role');});svg.setAttribute('viewBox',study.funnel.options.labels?'0 50 900 380':'130 50 520 380');preview.replaceChildren(svg);}
-  addParticles(svg,study);playback();
+  motion?.dispose();
+  if(rebuild){svg=renderFunnel(study.funnel.data,{...study.funnel.options,variant:'vertical',seed:study.funnel.seed,idPrefix:'particle-study'});svg.querySelectorAll('[data-key]').forEach(path=>{path.removeAttribute('tabindex');path.removeAttribute('role');});svg.setAttribute('viewBox',study.funnel.options.labels?'0 50 900 380':'130 50 520 380');roundContainers(svg,study);preview.replaceChildren(svg);}
+  const gaps=addParticles(svg,study);motion=animateTransfer(svg,study,gaps);playback();
   const amount=particleGaps(study).reduce((sum,gap)=>sum+gap.points.length,0);$('#summary').textContent=`${amount} dots · ${study.particles.duration} ms`;
 }
 function controls(){
@@ -19,9 +22,14 @@ function controls(){
     ['duration','Fall time',160,1200,20,v=>`${v} ms`],
     ['drift','Sideways drift',0,8,.5,v=>`${v.toFixed(1)} px`],
     ['edgeAngle','Edge angle',0,70,1,v=>`${v}° inward`]
+  ],study.particles],['surface-controls',[
+    ['absorption','Absorption',0,1,.05,v=>`${Math.round(v*100)}%`],
+    ['tension','Release tension',0,4,.1,v=>`${v.toFixed(1)} px`],
+    ['recoil','Container recoil',0,3,.1,v=>`${v.toFixed(1)} px`]
   ],study.particles],['container-controls',[
     ['stageGap','Container gap',6,20,1,v=>`${v} px`],
-    ['capCurve','Rim curvature',0,20,1,v=>`${v} px`]
+    ['capCurve','Rim curvature',0,20,1,v=>`${v} px`],
+    ['cornerRadius','Border radius',0,18,1,v=>`${v} px`]
   ],study.funnel.options]];
   for(const [id,rows,values]of groups){
     const holder=$('#'+id);holder.replaceChildren();

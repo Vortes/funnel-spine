@@ -1,6 +1,6 @@
 import {defaultStudy} from './default-study.js';
 
-export const particleRanges={size:[.5,2.5],count:[6,124],duration:[160,1200],drift:[0,8],edgeAngle:[0,70]};
+export const particleRanges={size:[.5,2.5],count:[6,124],duration:[160,1200],drift:[0,8],edgeAngle:[0,70],tension:[0,4],recoil:[0,3],absorption:[0,1]};
 export function createStudy(){return structuredClone(defaultStudy);}
 export function parseStudy(input){
   if(input?.version!==1||input.kind!=='vertical-particles')throw new Error('Choose a vertical particle study configuration.');
@@ -18,9 +18,13 @@ export function parseStudy(input){
   if(!['mixed','sparse','dense','am','hatch','cross','coarse'].includes(funnel.options.texture))throw new Error('Choose a supported screen sequence.');
   const particles={};
   for(const [key,[min,max]]of Object.entries(particleRanges)){
-    const value=key==='edgeAngle'?(input.particles?.[key]??0):input.particles?.[key];
+    const defaults={edgeAngle:0,tension:1.2,recoil:.8,absorption:.6};
+    const value=input.particles?.[key]??defaults[key];
     if(!Number.isFinite(value)||value<min||value>max||(key==='count'&&!Number.isInteger(value)))throw new Error(`${key} must be between ${min} and ${max}.`);
     particles[key]=value;
   }
-  return {version:1,kind:'vertical-particles',funnel:structuredClone(funnel),particles};
+  const cornerRadius=funnel.options.cornerRadius??0;
+  if(!Number.isFinite(cornerRadius)||cornerRadius<0||cornerRadius>18)throw new Error('cornerRadius must be between 0 and 18.');
+  const normalized=structuredClone(funnel);normalized.options.cornerRadius=cornerRadius;
+  return {version:1,kind:'vertical-particles',funnel:normalized,particles};
 }
