@@ -4,7 +4,9 @@ import { renderToString } from 'react-dom/server';
 import { JSDOM } from 'jsdom';
 import { AtlasFunnel } from 'funnel-spine';
 import { normalizeOptions } from './dist/lab/options.js';
+import { createConfig } from './dist/lab/config.js';
 import { validateData } from './dist/core/data.js';
+import { PAPER } from './dist/lab/screens.js';
 
 const stages = [
   { id: 'entry', label: 'Entry', value: 100 },
@@ -14,6 +16,15 @@ const stages = [
 assert.equal(renderToString(createElement(AtlasFunnel, { data: stages })), '<div style="display:block"></div>');
 assert.throws(() => normalizeOptions({ color: 'red' }), /Unknown funnel option/);
 assert.throws(() => normalizeOptions({ constructor: 1 }), /Unknown funnel option/);
+assert.throws(() => normalizeOptions({ texture: 'sparse' }), /supported screen pattern/);
+assert.throws(() => normalizeOptions({ verticalView: 'sideways' }), /vertical view/);
+assert.throws(() => normalizeOptions({ verticalViews: { flat: {}, isometric: { isoDepth: 202 } } }), /isometric isoDepth/);
+assert.throws(() => renderToString(createElement(AtlasFunnel, {
+  data: stages, variant: 'vertical', options: { verticalView: 'flat', verticalViews: { flat: {}, isometric: { tailRatio: 1 } } },
+})), /terminal taper/);
+const verticalConfig = createConfig('vertical');
+assert.equal(normalizeOptions(verticalConfig.options).isoDepth, verticalConfig.options.verticalViews.isometric.isoDepth);
+assert.equal(renderToString(createElement(AtlasFunnel, { data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 } })), '<div style="display:block"></div>');
 assert.throws(() => validateData([{ id: 1, label: 'Bad', value: 10 }, stages[1]]), /unique string id/);
 
 const dom = new JSDOM('<!doctype html><html><body><main id="app"></main></body></html>', { url: 'http://localhost' });
@@ -81,6 +92,16 @@ await act(async () => root.render(renderTree(tree, 'missing-key')));
 await act(async () => document.querySelector('#app [data-key]').dispatchEvent(new dom.window.Event('focus')));
 assert.equal(inspected.at(-1), 'link:root:left');
 
+await act(async () => root.render(createElement(AtlasFunnel, { data: stages, variant: 'vertical' })));
+assert.equal(document.querySelectorAll('#app [data-stage-face]').length, 0);
+await act(async () => root.render(createElement(AtlasFunnel, {
+  data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 }, selectedKey: 'entry',
+})));
+const faces = [...document.querySelectorAll('#app [data-stage-face]')];
+assert.equal(faces.length, 4);
+assert(faces.filter(face => face.getAttribute('data-stage-face') === 'finish').every(face => face.getAttribute('fill') === PAPER));
+assert(faces.filter(face => face.getAttribute('data-stage-face') === 'entry').every(face => face.getAttribute('fill') === face.getAttribute('data-base-fill')));
+
 await act(async () => root.render(createElement('section', null,
   createElement(AtlasFunnel, { data: stages, options }),
   createElement(AtlasFunnel, { data: stages, options }),
@@ -89,4 +110,4 @@ const svgIds = [...document.querySelectorAll('svg')].map(svg => svg.querySelecto
 assert.equal(new Set(svgIds).size, 2);
 await act(async () => root.unmount());
 dom.window.close();
-console.log('Verified React SSR import, DOM props and refs, inspection, keyboard selection, stable branching keys, and multiple SVG instances.');
+console.log('Verified React SSR import, geometry options, DOM props and refs, isometric face selection, stable branching keys, and multiple SVG instances.');

@@ -6,7 +6,26 @@ export type FunnelLink = { source: string; target: string; value: number };
 export type FunnelGraph = { nodes: readonly FunnelNode[]; links: readonly FunnelLink[] };
 export type FunnelData = readonly Stage[] | FunnelGraph;
 export type FunnelVariant = 'continuous' | 'vertical' | 'branching';
-export type Screen = 'mixed' | 'sparse' | 'dense' | 'am' | 'hatch' | 'cross' | 'coarse';
+export type Screen = 'mixed' | 'dense' | 'am' | 'hatch' | 'cross' | 'coarse';
+export type VerticalView = 'flat' | 'isometric';
+export type VerticalViewSettings = Partial<{
+  texture: Screen;
+  density: number;
+  strokeWidth: number;
+  patternAngle: number;
+  dotGain: number;
+  roughness: number;
+  fontSize: number;
+  labels: boolean;
+  paperGrain: boolean;
+  stageHeight: number;
+  stageGap: number;
+  capCurve: number;
+  borderRadius: number;
+  tailRatio: number;
+  isoDepth: number;
+  isoRotation: number;
+}>;
 
 export type FunnelOptions = {
   texture?: Screen;
@@ -22,11 +41,16 @@ export type FunnelOptions = {
   curve?: number;
   chartHeight?: number;
   edgeFade?: number;
+  mirror?: boolean;
   stageHeight?: number;
   stageGap?: number;
   capCurve?: number;
   borderRadius?: number;
   tailRatio?: number;
+  verticalView?: VerticalView;
+  isoDepth?: number;
+  isoRotation?: number;
+  verticalViews?: { flat: VerticalViewSettings; isometric: VerticalViewSettings };
   nodeGap?: number;
   nodeWidth?: number;
 };

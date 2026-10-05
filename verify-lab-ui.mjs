@@ -25,9 +25,17 @@ async function waitFor(predicate, label) {
 
 let dom = browser('<div id="lab-root"></div>');
 await import('./dist/lab/lab.js');
+await waitFor(() => document.querySelectorAll('#canvas [data-key]').length === 5, 'vertical figure');
+assert.match(document.querySelector('#figure-title').textContent, /Vertical funnel/);
+assert.equal(document.querySelectorAll('#canvas [data-stage-face]').length, 10);
+document.querySelector('[aria-label="Vertical view"] button:last-child').click();
+await waitFor(() => document.querySelectorAll('#canvas [data-stage-face]').length === 0, 'flat vertical view');
+document.querySelector('[data-variant="continuous"]').click();
 await waitFor(() => document.querySelectorAll('#canvas [data-key]').length === 4, 'continuous figure');
-assert.match(document.querySelector('#figure-title').textContent, /Continuous funnel/);
-assert.equal(document.querySelectorAll('#canvas [data-key]').length, 4);
+const halfPath = document.querySelector('#canvas [data-key]').getAttribute('d');
+document.querySelector('[aria-label="Continuous funnel shape"] button:last-child').click();
+await waitFor(() => document.querySelector('#canvas [data-key]')?.getAttribute('d') !== halfPath, 'mirrored continuous figure');
+assert.match(document.querySelector('#figure-caption').textContent, /Symmetric progression/);
 document.querySelector('[data-variant="branching"]').click();
 await waitFor(() => document.querySelectorAll('#canvas [data-key]').length === 10, 'branching figure');
 assert.equal(document.querySelector('[data-variant="branching"]').getAttribute('aria-pressed'), 'true');
@@ -52,6 +60,7 @@ dom = browser('<div id="particle-root"></div>');
 await import('./dist/lab/vertical-particles/study.js');
 await waitFor(() => Boolean(document.querySelector('#preview svg')), 'particle preview');
 assert(document.querySelector('#preview svg'));
+assert.equal(document.querySelectorAll('#preview [data-stage-face]').length, 0);
 assert.match(document.querySelector('#summary').textContent, /dots/);
 document.querySelector('#pause').click();
 await waitFor(() => document.querySelector('#preview')?.dataset.paused === 'true', 'paused particles');
@@ -59,4 +68,4 @@ assert.equal(document.querySelector('#pause').getAttribute('aria-pressed'), 'tru
 assert.equal(document.querySelector('#preview').dataset.paused, 'true');
 dom.window.close();
 
-console.log('Verified React lab variants, data validation, particle rendering, and playback controls.');
+console.log('Verified React lab views, mirrored geometry, branching inspection, data validation, particle rendering, and playback controls.');

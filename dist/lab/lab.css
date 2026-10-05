@@ -16,6 +16,10 @@ aside{background:var(--paper);border-right:.65px dashed var(--ink)}
 .texture-grid button{font-size:13px;min-height:39px;gap:12px;border:0;text-align:left;justify-content:flex-start}
 .texture-grid button[aria-pressed=true]{border:.65px solid var(--ink);background:var(--paper)}
 .texture-grid svg{flex-shrink:0}
+.view-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:24px}
+.view-switch>span{grid-column:1/-1;font:12px ui-monospace,monospace;letter-spacing:.1em}
+.view-switch button{font-size:12px;min-height:38px;padding:8px}
+.view-switch button[aria-pressed=true]{background:var(--ink);color:var(--paper)}
 .figure{padding-top:28px}
 .figure-head h2{font:700 29px/1.15 Arial,Helvetica,sans-serif;letter-spacing:-.8px;margin-top:6px;padding-left:17px;position:relative}
 .figure-head h2:before{content:'';position:absolute;left:0;top:1px;bottom:0;width:4px;background:var(--ink)}
@@ -44,6 +48,7 @@ input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:50%;bac
 pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 @media(max-width:1050px){.ink-spec{flex-wrap:wrap;font-size:10px}.ink-spec>span:last-child{margin-left:0}.screen-legend{gap:14px 9px}.legend-item{gap:8px}.legend-item>span{font-size:12px}}
 @media(max-width:740px){h1{font-size:37px}.figure-head h2{font-size:25px}.texture-grid{grid-template-columns:1fr 1fr}.screen-legend{grid-template-columns:1fr 1fr;gap:18px 12px}.ink-spec{gap:9px 15px;font-size:10px}.ink-spec>span:last-child{display:none}.lab-title p{padding-left:20px}.legend-item svg{width:28px;height:24px}}
+@media(max-width:740px){.variant-bar{overflow-x:auto;justify-content:flex-start}.variant-bar button{flex:none;white-space:nowrap}}
 
 ::selection{color:var(--paper);background:var(--ink)}
 .toggle input{appearance:none;-webkit-appearance:none;border:.65px solid var(--ink);background:var(--paper);border-radius:0;cursor:pointer}
@@ -67,3 +72,13 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 .fade-preview{height:14px;margin-top:7px;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 5px);pointer-events:none;user-select:none}
 .control--fade input[type=range]{height:40px}
 .fade-hint{display:block;margin-top:7px;font:11px/1.4 ui-monospace,monospace;color:var(--muted)}
+.chart-intro--vertical .print-mark{animation:chart-print-in 300ms cubic-bezier(.32,.72,0,1) both;animation-delay:calc(var(--print-step)*70ms)}
+@keyframes chart-print-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.chart-intro--continuous .print-wipe,.chart-intro--branching .print-wipe{transform-box:fill-box;transform-origin:left center;animation:chart-branch-in 680ms cubic-bezier(.25,.1,.25,1) both}
+@keyframes chart-branch-in{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media(prefers-reduced-motion:reduce){.chart-intro .print-mark,.chart-intro .print-wipe{animation:none}}
+@media(min-width:741px){
+ .workspace>aside{align-self:stretch;min-height:0;padding:0}
+ .sidebar-scroll{position:sticky;top:16px;height:min(900px,calc(100dvh - 265px));min-height:320px;padding:24px 22px;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
+}
+@media(min-width:741px) and (max-width:1050px){.sidebar-scroll{padding:22px 16px}}

@@ -6,9 +6,9 @@ import { format, percent } from './utils';
 import type { LabConfig, LabPath, LabSvg, PathInfo, Variant } from './types';
 
 const titles: Record<Variant, string> = { continuous: 'Continuous funnel', vertical: 'Vertical funnel', branching: 'Branching funnel' };
-const captions: Record<Variant, string> = {
-  continuous: '01 / Cohort progression · height encodes quantity',
-  vertical: '02 / Stage comparison · width encodes quantity',
+const captions = {
+  continuous: { half: '02 / Cohort progression · height encodes quantity', mirrored: '02 / Symmetric progression · full thickness encodes quantity' },
+  vertical: { isometric: '01 / Projected stages · front width encodes quantity', flat: '01 / Stage comparison · width encodes quantity' },
   branching: '03 / Connected buckets · every split distributes 100%',
 };
 
@@ -41,6 +41,10 @@ function highlight(svg: LabSvg, info: PathInfo | null, selectedKey: string | nul
     else path.setAttribute('stroke-dasharray', '2 4');
     path.setAttribute('aria-pressed', String(selectedKey === path.atlasInfo.key));
     path.atlasEmphasis?.setAttribute('data-emphasis', String(Boolean(info) && active));
+  });
+  svg.querySelectorAll('[data-stage-face]').forEach(face => {
+    const active = !info || face.getAttribute('data-stage-face') === info.key;
+    face.setAttribute('fill', active ? face.getAttribute('data-base-fill')! : PAPER);
   });
 }
 
@@ -111,8 +115,41 @@ function attachProximity(svg: LabSvg, sections: LabPath[], canvas: HTMLDivElemen
   });
 }
 
-function FunnelCanvas({ config, selectedKey, onSelect, onInspect, onPathsChange, onRenderError, svgRef }: {
+function printEntrance(svg: LabSvg, variant: Variant) {
+  svg.classList.add('chart-intro', `chart-intro--${variant}`);
+  const ribbons = paths(svg);
+  if (variant === 'vertical') {
+    const steps = new Map(ribbons.map((path, index) => [path.atlasInfo.key, index]));
+    ribbons.forEach((path, index) => {
+      path.classList.add('print-mark');
+      path.style.setProperty('--print-step', String(index));
+    });
+    svg.querySelectorAll<SVGElement>('[data-stage-face],[data-stage-outline]').forEach(face => {
+      const key = face.getAttribute('data-stage-face') ?? face.getAttribute('data-stage-outline');
+      face.classList.add('print-mark');
+      face.style.setProperty('--print-step', String(steps.get(key ?? '') ?? 0));
+    });
+    return;
+  }
+  const [, , width, height] = svg.getAttribute('viewBox')!.split(' ').map(Number);
+  const id = 'lab-figure-print-wipe';
+  const clip = element('clipPath', { id, clipPathUnits: 'userSpaceOnUse' });
+  clip.append(element('rect', { x: 0, y: 0, width, height, class: 'print-wipe' }));
+  const defs = element('defs');
+  defs.append(clip);
+  svg.prepend(defs);
+  const otherMarks = variant === 'branching'
+    ? [...svg.querySelectorAll(':scope > rect')].slice(1)
+    : [...svg.querySelectorAll('[data-ink-baseline]')];
+  for (const node of [...ribbons, ...otherMarks]) {
+    node.setAttribute('clip-path', `url(#${id})`);
+    (node as LabPath).atlasEmphasis?.setAttribute('clip-path', `url(#${id})`);
+  }
+}
+
+function FunnelCanvas({ config, introToken, selectedKey, onSelect, onInspect, onPathsChange, onRenderError, svgRef }: {
   config: LabConfig;
+  introToken: number;
   selectedKey: string | null;
   onSelect: (key: string | null) => void;
   onInspect: (info: PathInfo | null) => void;
@@ -122,6 +159,7 @@ function FunnelCanvas({ config, selectedKey, onSelect, onInspect, onPathsChange,
 }) {
   const host = useRef<HTMLDivElement>(null);
   const hover = useRef<PathInfo | null>(null);
+  const lastIntro = useRef(0);
   const selected = useRef(selectedKey);
   selected.current = selectedKey;
 
@@ -141,6 +179,7 @@ function FunnelCanvas({ config, selectedKey, onSelect, onInspect, onPathsChange,
           'aria-hidden': 'true', 'pointer-events': 'none', 'data-emphasis': 'false',
         }) as SVGPathElement;
         if (path.hasAttribute('mask')) emphasis.setAttribute('mask', path.getAttribute('mask')!);
+        if (path.hasAttribute('clip-path')) emphasis.setAttribute('clip-path', path.getAttribute('clip-path')!);
         path.atlasEmphasis = emphasis;
         svg.append(emphasis);
         const preview = () => {
@@ -183,6 +222,10 @@ function FunnelCanvas({ config, selectedKey, onSelect, onInspect, onPathsChange,
       const pinned = infos.find(info => info.key === selected.current) ?? null;
       highlight(svg, pinned, selected.current);
       if (selected.current && !pinned) onSelect(null);
+      if (introToken > lastIntro.current) {
+        printEntrance(svg, config.variant);
+        lastIntro.current = introToken;
+      }
       return () => { svgRef.current = null; svg.remove(); };
     } catch (error) {
       svgRef.current = null;
@@ -190,7 +233,7 @@ function FunnelCanvas({ config, selectedKey, onSelect, onInspect, onPathsChange,
       onPathsChange([]);
       onRenderError(error instanceof Error ? error.message : String(error));
     }
-  }, [config, onSelect, onInspect, onPathsChange, onRenderError, svgRef]);
+  }, [config, introToken, onSelect, onInspect, onPathsChange, onRenderError, svgRef]);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -202,8 +245,9 @@ function FunnelCanvas({ config, selectedKey, onSelect, onInspect, onPathsChange,
   return <div id="canvas" className="canvas" tabIndex={-1} ref={host} />;
 }
 
-export function FigurePanel({ config, selectedKey, inspected, infos, error, svgRef, onSelect, onInspect, onPathsChange, onRenderError, onExport }: {
+export function FigurePanel({ config, introToken, selectedKey, inspected, infos, error, svgRef, onSelect, onInspect, onPathsChange, onRenderError, onExport }: {
   config: LabConfig;
+  introToken: number;
   selectedKey: string | null;
   inspected: PathInfo | null;
   infos: PathInfo[];
@@ -215,8 +259,11 @@ export function FigurePanel({ config, selectedKey, inspected, infos, error, svgR
   onRenderError: (error: string | null) => void;
   onExport: () => void;
 }) {
-  const index = ['continuous', 'vertical', 'branching'].indexOf(config.variant);
+  const index = ['vertical', 'continuous', 'branching'].indexOf(config.variant);
   const active = infos.find(info => info.key === selectedKey) ?? inspected ?? infos[0] ?? null;
+  const caption = config.variant === 'vertical' ? captions.vertical[config.options.verticalView ?? 'flat']
+    : config.variant === 'continuous' ? captions.continuous[config.options.mirror ? 'mirrored' : 'half']
+      : captions.branching;
   return <section className="figure">
     <div className="figure-head"><div>
       <span id="figure-number" className="overline">FIG. 00{index + 1}</span>
@@ -224,9 +271,9 @@ export function FigurePanel({ config, selectedKey, inspected, infos, error, svgR
       <p className="figure-subtitle">{config.variant === 'branching' ? 'One entry bucket. Every split distributes 100% to its children.' : 'A study of quantity, progression, and loss.'}</p>
     </div><div className="figure-actions"><a href="/lab/benchmark.html">Stipple benchmark ↗</a><a href="/lab/vertical-particles/">Particle study ↗</a><button id="svg-export" disabled={Boolean(error) || !infos.length} onClick={onExport}>Export SVG</button></div></div>
     <div className="ink-spec"><span className="ink-mark" aria-hidden="true" /><span>BLUE 01 <b>#2F4FE0</b></span><span>COOL GRAY STOCK <b>#E4E5E8</b></span><span>ONE SPOT INK</span></div>
-    <FunnelCanvas config={config} selectedKey={selectedKey} onSelect={onSelect} onInspect={onInspect} onPathsChange={onPathsChange} onRenderError={onRenderError} svgRef={svgRef} />
+    <FunnelCanvas config={config} introToken={introToken} selectedKey={selectedKey} onSelect={onSelect} onInspect={onInspect} onPathsChange={onPathsChange} onRenderError={onRenderError} svgRef={svgRef} />
     <ScreenLegend options={config.options} seed={config.seed} />
-    <div className="caption"><span id="figure-caption">{captions[config.variant]}</span><span>Hover to inspect · click to pin</span></div>
+    <div className="caption"><span id="figure-caption">{caption}</span><span>Hover to inspect · click to pin</span></div>
     <div className="inspector" aria-live="polite"><div><span id="inspect-state">{selectedKey ? 'PINNED PATH' : 'PATH INSPECTOR'}</span><strong id="inspect-path">{active?.label ?? 'Explore a ribbon'}</strong></div>
       <div><span>Quantity</span><strong id="inspect-value">{active ? format(active.value) : '—'}</strong></div>
       <div><span>Conversion</span><strong id="inspect-conversion">{active ? percent(active.value, active.denominator) : '—'}</strong></div>

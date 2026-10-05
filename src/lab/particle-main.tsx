@@ -40,7 +40,7 @@ function ParticlePreview({ study, paused, reduced, hostRef }: { study: ParticleS
   const svgRef = useRef<SVGSVGElement | null>(null);
   const motionRef = useRef<ReturnType<typeof animateTransfer> | null>(null);
   useEffect(() => {
-    const svg = renderFunnel(study.funnel.data, { ...study.funnel.options, variant: 'vertical', seed: study.funnel.seed, idPrefix: 'particle-study' }) as SVGSVGElement;
+    const svg = renderFunnel(study.funnel.data, { ...study.funnel.options, variant: 'vertical', verticalView: 'flat', seed: study.funnel.seed, idPrefix: 'particle-study' }) as SVGSVGElement;
     svg.querySelectorAll('[data-key]').forEach(path => { path.removeAttribute('tabindex'); path.removeAttribute('role'); });
     svg.setAttribute('viewBox', study.funnel.options.labels ? '0 50 900 380' : '130 50 520 380');
     roundContainers(svg, study);

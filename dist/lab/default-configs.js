@@ -5,7 +5,7 @@ export const defaultConfigs={
     "seed": 1234,
     "dataOrigin": "seed",
     "options": {
-      "texture": "dense",
+      "texture": "mixed",
       "density": 3,
       "strokeWidth": 0.5,
       "patternAngle": -45,
@@ -18,6 +18,7 @@ export const defaultConfigs={
       "curve": 0.45,
       "chartHeight": 265,
       "edgeFade": 0,
+      "mirror": false,
       "stageHeight": 310,
       "stageGap": 9,
       "capCurve": 12,
@@ -57,16 +58,16 @@ export const defaultConfigs={
   "vertical": {
     "version": 3,
     "variant": "vertical",
-    "seed": 1234,
+    "seed": 1515972923,
     "dataOrigin": "seed",
     "options": {
-      "texture": "dense",
+      "texture": "mixed",
       "density": 3,
       "strokeWidth": 0.5,
       "patternAngle": -45,
       "dotGain": 0.2,
       "roughness": 0.15,
-      "paperGrain": false,
+      "paperGrain": true,
       "fontSize": 14,
       "labels": true,
       "guides": true,
@@ -74,38 +75,41 @@ export const defaultConfigs={
       "chartHeight": 235,
       "edgeFade": 0,
       "stageHeight": 330,
-      "stageGap": 4,
+      "stageGap": 20,
       "capCurve": 0,
-      "borderRadius": 4,
-      "tailRatio": 0.6,
+      "borderRadius": 3,
+      "tailRatio": 0.15,
       "nodeGap": 66,
-      "nodeWidth": 2.5
+      "nodeWidth": 2.5,
+      "verticalView": "isometric",
+      "isoDepth": 36,
+      "isoRotation": 30
     },
     "data": [
       {
         "id": "visitors",
         "label": "Visitors",
-        "value": 10400
+        "value": 14500
       },
       {
         "id": "engaged",
         "label": "Engaged",
-        "value": 6566
+        "value": 10407
       },
       {
         "id": "signups",
         "label": "Signups",
-        "value": 4669
+        "value": 6960
       },
       {
         "id": "activated",
         "label": "Activated",
-        "value": 3447
+        "value": 3676
       },
       {
         "id": "converted",
         "label": "Converted",
-        "value": 1263
+        "value": 1676
       }
     ]
   },
@@ -115,7 +119,7 @@ export const defaultConfigs={
     "seed": 1234,
     "dataOrigin": "seed",
     "options": {
-      "texture": "dense",
+      "texture": "mixed",
       "density": 3,
       "strokeWidth": 0.4,
       "patternAngle": -25,

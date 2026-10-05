@@ -12,25 +12,35 @@ const shared: RangeRow[] = [
   ['roughness', 'Edge irregularity', 0, .6, .05, 'px'],
   ['fontSize', 'Label size', 12, 18, 1, 'px'],
 ];
-const shapes: Record<Variant, RangeRow[]> = {
+const shapes = {
   continuous: [
     ['curve', 'Curvature', .1, .8, .05, ''],
     ['chartHeight', 'Funnel height', 120, 265, 5, 'px'],
     ['edgeFade', 'Edge fade', 0, .45, .05, '%'],
   ],
-  vertical: [
-    ['stageHeight', 'Funnel height', 250, 330, 5, 'px'],
-    ['stageGap', 'Stage gap', 0, 20, 1, 'px'],
-    ['capCurve', 'Cap curvature', 0, 20, 1, 'px'],
-    ['borderRadius', 'Border radius', 0, 20, 1, 'px'],
-    ['tailRatio', 'Terminal taper', .15, 1, .05, '%'],
-  ],
+  vertical: {
+    flat: [
+      ['stageHeight', 'Funnel height', 250, 330, 5, 'px'],
+      ['stageGap', 'Stage gap', 0, 20, 1, 'px'],
+      ['capCurve', 'Cap curvature', 0, 20, 1, 'px'],
+      ['borderRadius', 'Border radius', 0, 20, 1, 'px'],
+      ['tailRatio', 'Terminal taper', .15, 1, .05, '%'],
+    ],
+    isometric: [
+      ['stageHeight', 'Funnel height', 250, 330, 5, 'px'],
+      ['stageGap', 'Stage gap', 0, 20, 1, 'px'],
+      ['isoDepth', 'Projection depth', 18, 200, 2, 'px'],
+      ['isoRotation', 'View rotation', -45, 45, 5, '°'],
+      ['borderRadius', 'Border radius', 0, 20, 1, 'px'],
+      ['tailRatio', 'Terminal taper', .15, .95, .05, '%'],
+    ],
+  },
   branching: [
     ['curve', 'Curvature', .1, .8, .05, ''],
     ['nodeGap', 'Branch spacing', 28, 85, 1, 'px'],
     ['nodeWidth', 'Node width', 1, 6, .5, 'px'],
   ],
-};
+} satisfies { continuous: RangeRow[]; vertical: { flat: RangeRow[]; isometric: RangeRow[] }; branching: RangeRow[] };
 
 function display(value: number, unit: string) {
   if (unit === '%') return `${Math.round(value * 100)}%`;
@@ -58,30 +68,41 @@ function RangeControl({ row, value, onChange }: { row: RangeRow; value: number; 
   </div>;
 }
 
-export function PrintSettings({ variant, options, seed, seedDraft, onOptionChange, onSeedDraft, onSeedCommit, onSample, onReset }: {
+export function PrintSettings({ variant, options, seed, seedDraft, onOptionChange, onVerticalViewChange, onSeedDraft, onSeedCommit, onSample, onReset }: {
   variant: Variant;
   options: LabOptions;
   seed: number;
   seedDraft: string;
   onOptionChange: (key: keyof LabOptions, value: number | boolean | string) => void;
+  onVerticalViewChange: (view: 'flat' | 'isometric') => void;
   onSeedDraft: (value: string) => void;
   onSeedCommit: () => void;
   onSample: () => void;
   onReset: () => void;
 }) {
-  const choices = [['mixed', 'Atlas mix'], ...screenTypes.map(type => [type, screenLabels[type as keyof typeof screenLabels]])];
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [variant]);
+  const choices = ['mixed', ...screenTypes];
+  const geometry = variant === 'vertical' ? shapes.vertical[options.verticalView ?? 'flat'] : shapes[variant];
   const toggles: [keyof LabOptions, string][] = variant === 'vertical'
     ? [['labels', 'Direct annotations'], ['paperGrain', 'Paper grain']]
     : [['labels', 'Direct annotations'], ['guides', 'Stage guides'], ['paperGrain', 'Paper grain']];
-  return <aside aria-label="Figure controls">
+  return <aside aria-label="Figure controls"><div className="sidebar-scroll" ref={scrollRef}>
     <div className="panel-heading"><h2>Print settings</h2><button id="reset" onClick={onReset}>Reset variant</button></div>
     <div id="controls">
-      <div className="texture-grid" role="group" aria-label="Screen sequence">
-        {choices.map(([type, label]) => <button key={type} data-texture={type} aria-pressed={options.texture === type} onClick={() => onOptionChange('texture', type)}>
-          <ScreenSwatch type={type} options={options} seed={seed} idPrefix={`control-${type}`} />{label}
+      {variant === 'vertical' && <div className="view-switch" role="group" aria-label="Vertical view"><span>VIEW</span>
+        {(['isometric', 'flat'] as const).map(view => <button key={view} aria-pressed={options.verticalView === view} onClick={() => onVerticalViewChange(view)}>{view === 'isometric' ? 'Isometric' : 'Flat'}</button>)}
+      </div>}
+      {variant === 'continuous' && <div className="view-switch" role="group" aria-label="Continuous funnel shape"><span>SHAPE</span>
+        <button aria-pressed={!options.mirror} onClick={() => onOptionChange('mirror', false)}>Half</button>
+        <button aria-pressed={Boolean(options.mirror)} onClick={() => onOptionChange('mirror', true)}>Full mirror</button>
+      </div>}
+      <div className="texture-grid" role="group" aria-label="Chart pattern">
+        {choices.map(type => <button key={type} data-texture={type} aria-pressed={options.texture === type} onClick={() => onOptionChange('texture', type)}>
+          <ScreenSwatch type={type} options={options} seed={seed} idPrefix={`control-${type}`} />{screenLabels[type as keyof typeof screenLabels]}
         </button>)}
       </div>
-      {([['Ink & screen', shared], ['Geometry', shapes[variant]]] as const).map(([title, rows]) => <fieldset key={title}>
+      {([['Ink & screen', shared], ['Geometry', geometry]] as const).map(([title, rows]) => <fieldset key={title}>
         <legend>{title}</legend>
         {rows.map(row => <RangeControl key={row[0]} row={row} value={options[row[0]] as number} onChange={value => onOptionChange(row[0], value)} />)}
       </fieldset>)}
@@ -89,21 +110,20 @@ export function PrintSettings({ variant, options, seed, seedDraft, onOptionChang
         <input id={key} type="checkbox" checked={options[key] as boolean} onChange={event => onOptionChange(key, event.target.checked)} />
       </label>)}
     </div>
-    <p className="screen-note">Choose the starting screen. Neighboring ribbons use different screens.</p>
+    <p className="screen-note">Choose one pattern for the whole chart, or Atlas mix for variation across ribbons.</p>
     <div className="dataset-controls"><label htmlFor="seed">Dataset seed</label><div>
       <input id="seed" type="number" min="0" max="4294967295" step="1" value={seedDraft} onChange={event => onSeedDraft(event.target.value)} onBlur={onSeedCommit} onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
       <button id="generate" onClick={onSample}>New sample</button>
     </div><p>The same seed produces the same data.</p></div>
-  </aside>;
+  </div></aside>;
 }
 
 export function ScreenLegend({ options, seed }: { options: LabOptions; seed: number }) {
-  const names: (keyof typeof screenLabels)[] = ['sparse', 'dense', 'am', 'hatch', 'cross', 'coarse', 'solid'];
-  const caption = (type: string) => type === 'am' ? '30% SCREEN' : type === 'cross' || type === 'hatch' ? '50% SCREEN' : type === 'coarse' ? '70% SCREEN' : type === 'solid' ? 'SMALL MARKS ONLY' : 'STOCHASTIC';
+  const names = options.texture === 'mixed' ? screenTypes : [options.texture];
   return <div className="screen-legend" id="screen-legend" aria-label="Screen legend">
     {names.map(type => <div className="legend-item" key={type}>
       <ScreenSwatch type={type} options={options} seed={seed} idPrefix={`legend-${type}`} />
-      <span>{screenLabels[type]}<small>{caption(type)}</small></span>
+      <span>{screenLabels[type as keyof typeof screenLabels]}<small>{options.texture === 'mixed' ? 'MIXED SCREEN' : 'FULL CHART'}</small></span>
     </div>)}
   </div>;
 }

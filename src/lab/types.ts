@@ -1,7 +1,8 @@
 import type { FunnelData, FunnelOptions, FunnelVariant, Inspection } from '../../dist/react/atlas-funnel';
 
 export type Variant = FunnelVariant;
-export type LabOptions = Required<FunnelOptions>;
+export type LabOptions = Required<Omit<FunnelOptions, 'mirror' | 'verticalView' | 'verticalViews' | 'isoDepth' | 'isoRotation'>> &
+  Pick<FunnelOptions, 'mirror' | 'verticalView' | 'verticalViews' | 'isoDepth' | 'isoRotation'>;
 export type LabConfig = {
   version: 3;
   variant: Variant;

@@ -1,9 +1,11 @@
 import {validateData} from '../core/data.js';
-import {layoutGraph} from './lab-engine.js';
-import {ranges,defaultOptions,normalizeOptions} from './options.js';
+import {layoutGraph,isometricStageGeometry} from './lab-engine.js';
+import {ranges,defaultOptions,normalizeOptions,verticalSettings} from './options.js';
 import {defaultConfigs} from './default-configs.js';
-export const variants=['continuous','vertical','branching'];
+export const variants=['vertical','continuous','branching'];
 export {ranges,defaultOptions};
+export function setVerticalControl(options,key,value){options[key]=value;options.verticalViews[options.verticalView][key]=value;}
+export function setVerticalView(options,view){options.verticalViews[options.verticalView]=verticalSettings(options);Object.assign(options,options.verticalViews[view]);options.verticalView=view;}
 export function sampleData(variant,seed){
  let a=seed>>>0;const random=()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};
  const total=10000+Math.round(random()*5000/100)*100;
@@ -20,18 +22,29 @@ export function sampleData(variant,seed){
    {source:'paid-signup',target:'paid-active',value:paidActive},{source:'paid-signup',target:'paid-inactive',value:paidSignup-paidActive}]
  };
 }
-export function createConfig(variant,seed=defaultConfigs[variant].seed){const config=structuredClone(defaultConfigs[variant]);if(seed!==config.seed){config.seed=seed;config.data=sampleData(variant,seed);}return config;}
+export function createConfig(variant,seed=defaultConfigs[variant].seed){const config=structuredClone(defaultConfigs[variant]);if(variant==='vertical')config.options.verticalViews={isometric:verticalSettings(config.options),flat:verticalSettings(config.options)};if(seed!==config.seed){config.seed=seed;config.data=sampleData(variant,seed);}return config;}
 export function parseConfig(input){
- if(!input||![1,2,3].includes(input.version)||!variants.includes(input.variant))throw new Error('Choose an atlas lab configuration with version 1, 2, or 3 and a supported variant.');
+ if(!input||![1,2,3].includes(input.version)||![...variants,'isometric'].includes(input.variant))throw new Error('Choose an atlas lab configuration with version 1, 2, or 3 and a supported variant.');
  if(!Number.isInteger(input.seed)||input.seed<0||input.seed>4294967295)throw new Error('Seed must be an integer between 0 and 4294967295.');
  if(!input.options||typeof input.options!=='object')throw new Error('The configuration needs an options object.');
- const source={...input.options};
- if(input.version===1){source.strokeWidth=Math.min(.75,Math.max(.25,(source.strokeWidth??1)*.75));source.nodeWidth=Math.min(6,Math.max(1,source.nodeWidth??2.5));source.texture=source.texture==='stipple'?'sparse':source.texture==='solid'?'mixed':source.texture;}
- if(source.texture===undefined)throw new Error('Choose a supported screen sequence.');
- const defaults={...defaultOptions,...defaultConfigs[input.variant].options};
- if(input.variant==='vertical'&&source.borderRadius===undefined)defaults.borderRadius=0;
- const options=normalizeOptions(source,defaults,{strict:false});
+ const variant=input.variant==='isometric'?'vertical':input.variant,source={...input.options};
+ if(input.version===1){source.strokeWidth=Math.min(.75,Math.max(.25,(source.strokeWidth??1)*.75));source.nodeWidth=Math.min(6,Math.max(1,source.nodeWidth??2.5));}
+ if(['stipple','solid','sparse'].includes(source.texture))source.texture='dense';
+ if(source.texture===undefined)throw new Error('Choose a supported screen pattern.');
+ const base={...defaultOptions,...defaultConfigs[variant].options};
+ if(variant==='continuous')source.mirror??=false;
+ if(variant==='vertical'){
+  source.verticalView??=input.variant==='isometric'?'isometric':'flat';
+  if(source.borderRadius===undefined)base.borderRadius=0;
+ }
+ const options=normalizeOptions(source,base,{strict:false});
+ if(variant==='vertical'){
+  if(source.verticalViews===undefined){
+   const current=verticalSettings(options);
+   options.verticalViews={isometric:{...current,tailRatio:options.verticalView==='flat'&&current.tailRatio===1?defaultConfigs.vertical.options.tailRatio:current.tailRatio},flat:{...current}};
+  }
+ }
  const data=input.version<3&&input.variant==='branching'&&input.dataOrigin==='seed'?sampleData('branching',input.seed):input.data;
- validateData(data,input.variant);if(input.variant==='branching')layoutGraph(data,options);
- return{version:3,variant:input.variant,seed:input.seed,dataOrigin:input.dataOrigin==='custom'?'custom':'seed',options,data:structuredClone(data)};
+ validateData(data,variant);if(variant==='branching')layoutGraph(data,options);if(variant==='vertical')isometricStageGeometry(data,{...options,...options.verticalViews.isometric});
+ return{version:3,variant,seed:input.seed,dataOrigin:input.dataOrigin==='custom'?'custom':'seed',options,data:structuredClone(data)};
 }

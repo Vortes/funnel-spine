@@ -1,15 +1,15 @@
 import { createRoot } from 'react-dom/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { validateData } from '../../dist/core/data.js';
-import { layoutGraph, renderFunnel } from '../../dist/lab/lab-engine.js';
-import { createConfig, parseConfig, sampleData } from '../../dist/lab/config.js';
+import { renderFunnel } from '../../dist/lab/lab-engine.js';
+import { createConfig, parseConfig, sampleData, setVerticalControl, setVerticalView } from '../../dist/lab/config.js';
 import { PrintSettings } from './Controls';
 import { Details, type DetailView } from './Details';
 import { FigurePanel } from './Figure';
 import { download } from './utils';
 import type { LabConfig, LabOptions, LabSvg, PathInfo, SavedConfig, Variant } from './types';
 
-const variants: Variant[] = ['continuous', 'vertical', 'branching'];
+const variants: Variant[] = ['vertical', 'continuous', 'branching'];
 const titles: Record<Variant, string> = { continuous: 'Continuous funnel', vertical: 'Vertical funnel', branching: 'Branching funnel' };
 const storageKey = 'atlas-funnel-lab-configs-v1';
 
@@ -28,15 +28,16 @@ function loadSaved(): { items: SavedConfig[]; available: boolean } {
 
 function App() {
   const [configs, setConfigs] = useState<Record<Variant, LabConfig>>(() => Object.fromEntries(variants.map(variant => [variant, createConfig(variant)])) as Record<Variant, LabConfig>);
-  const [variant, setVariant] = useState<Variant>('continuous');
+  const [variant, setVariant] = useState<Variant>('vertical');
+  const [introToken, setIntroToken] = useState(0);
   const [view, setView] = useState<DetailView>('config');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [inspected, setInspected] = useState<PathInfo | null>(null);
   const [infos, setInfos] = useState<PathInfo[]>([]);
   const [renderError, setRenderError] = useState<string | null>(null);
-  const [dataDraft, setDataDraft] = useState(() => JSON.stringify(createConfig('continuous').data, null, 2));
+  const [dataDraft, setDataDraft] = useState(() => JSON.stringify(createConfig('vertical').data, null, 2));
   const [dataError, setDataError] = useState('');
-  const [seedDraft, setSeedDraft] = useState(() => String(createConfig('continuous').seed));
+  const [seedDraft, setSeedDraft] = useState(() => String(createConfig('vertical').seed));
   const [saved, setSaved] = useState(loadSaved);
   const [configName, setConfigName] = useState('');
   const [notice, setNotice] = useState<{ text: string; id: number } | null>(null);
@@ -56,7 +57,8 @@ function App() {
   const pathsChanged = useCallback((next: PathInfo[]) => setInfos(next), []);
   const renderFailed = useCallback((error: string | null) => setRenderError(error), []);
 
-  function switchVariant(next: Variant) {
+  function switchVariant(next: Variant, playIntro = false) {
+    if (next !== variant && playIntro) setIntroToken(current => current + 1);
     setVariant(next);
     setSelectedKey(null);
     setInspected(null);
@@ -78,10 +80,20 @@ function App() {
   }
 
   function updateOption(key: keyof LabOptions, value: number | boolean | string) {
-    setConfigs(current => ({
-      ...current,
-      [variant]: { ...current[variant], options: { ...current[variant].options, [key]: value } as LabOptions },
-    }));
+    setConfigs(current => {
+      const options = structuredClone(current[variant].options);
+      if (variant === 'vertical') setVerticalControl(options, key, value);
+      else Object.assign(options, { [key]: value });
+      return { ...current, [variant]: { ...current[variant], options } };
+    });
+  }
+
+  function changeVerticalView(view: 'flat' | 'isometric') {
+    setConfigs(current => {
+      const options = structuredClone(current.vertical.options);
+      setVerticalView(options, view);
+      return { ...current, vertical: { ...current.vertical, options } };
+    });
   }
 
   function sample(seed: number) {
@@ -103,8 +115,8 @@ function App() {
     try {
       const data: unknown = JSON.parse(dataDraft);
       validateData(data, variant);
-      if (variant === 'branching') layoutGraph(data, config.options);
-      setConfigs(current => ({ ...current, [variant]: { ...current[variant], data, dataOrigin: 'custom' } }));
+      const next = parseConfig({ ...config, data, dataOrigin: 'custom' }) as LabConfig;
+      setConfigs(current => ({ ...current, [variant]: next }));
       setSelectedKey(null);
       setInspected(null);
       setDataError('');
@@ -179,11 +191,11 @@ function App() {
       <button id="download" onClick={() => download(JSON.stringify(config, null, 2), `atlas-lab-${variant}-${config.seed}.json`, 'application/json')}>Export config</button>
       <button id="save" className="primary" disabled={Boolean(renderError)} onClick={save}>Save configuration</button>
     </div></div>
-      <div className="variant-bar" role="group" aria-label="Funnel variant">{variants.map((item, index) => <button key={item} data-variant={item} aria-pressed={variant === item} onClick={() => switchVariant(item)}><span>0{index + 1}</span> {item[0].toUpperCase() + item.slice(1)}</button>)}<span className="variant-note">Each variant keeps its own settings.</span></div>
+      <div className="variant-bar" role="group" aria-label="Funnel variant">{variants.map((item, index) => <button key={item} data-variant={item} aria-pressed={variant === item} onClick={event => switchVariant(item, event.detail !== 0)}><span>0{index + 1}</span> {item[0].toUpperCase() + item.slice(1)}</button>)}<span className="variant-note">Each variant keeps its own settings.</span></div>
       <div className="workspace">
-        <PrintSettings variant={variant} options={config.options} seed={config.seed} seedDraft={seedDraft} onOptionChange={updateOption} onSeedDraft={setSeedDraft} onSeedCommit={commitSeed} onSample={() => sample(crypto.getRandomValues(new Uint32Array(1))[0])} onReset={() => { replaceConfig(createConfig(variant) as LabConfig); showNotice('Variant reset'); }} />
+        <PrintSettings variant={variant} options={config.options} seed={config.seed} seedDraft={seedDraft} onOptionChange={updateOption} onVerticalViewChange={changeVerticalView} onSeedDraft={setSeedDraft} onSeedCommit={commitSeed} onSample={() => sample(crypto.getRandomValues(new Uint32Array(1))[0])} onReset={() => { replaceConfig(createConfig(variant) as LabConfig); showNotice('Variant reset'); }} />
         <div className="working-area">
-          <FigurePanel config={config} selectedKey={selectedKey} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onSelect={select} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
+          <FigurePanel config={config} introToken={introToken} selectedKey={selectedKey} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onSelect={select} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
           <Details config={config} view={view} dataDraft={dataDraft} dataError={dataError} infos={infos} onView={next => { setView(next); if (next === 'data') setDataDraft(JSON.stringify(config.data, null, 2)); }} onDataDraft={setDataDraft} onApplyData={applyData} onRestoreData={() => sample(config.seed)} onSelectRow={key => { setSelectedKey(current => current === key ? null : key); setInspected(infos.find(info => info.key === key) ?? null); }} onCopy={() => void copy()} />
         </div>
       </div>

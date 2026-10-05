@@ -46,7 +46,7 @@ export function ConversionChart() {
 }
 ```
 
-The component accepts standard `div` props and a `ref` to its container. It supports `onInspect`, `onSelectionChange`, and controlled or uncontrolled selection. See [the integration contract](docs/react-integration.md) for branching data, lab config reuse, options, and behavior.
+The component accepts standard `div` props and a `ref` to its container. It supports `onInspect`, `onSelectionChange`, and controlled or uncontrolled selection. The lab also exercises Isometric and Flat Vertical views, mirrored Continuous funnels, and whole-chart or mixed print patterns through React controls. See [the integration contract](docs/react-integration.md) for branching data, lab config reuse, options, and behavior.
 
 ## Source map
 

@@ -2,7 +2,7 @@
 
 import { createElement, forwardRef, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { validateData } from '../core/data.js';
-import { layoutGraph, renderFunnel } from '../lab/lab-engine.js';
+import { isometricStageGeometry, layoutGraph, renderFunnel } from '../lab/lab-engine.js';
 import { normalizeOptions } from '../lab/options.js';
 import { INK, PAPER } from '../lab/screens.js';
 
@@ -40,6 +40,10 @@ function highlight(svg, activeKey, selectedKey) {
     else path.setAttribute('stroke-dasharray', '2 4');
     path.setAttribute('aria-pressed', String(path.atlasInfo.key === selectedKey));
   });
+  svg.querySelectorAll('[data-stage-face]').forEach(face => {
+    const visible = !active || face.getAttribute('data-stage-face') === active.key;
+    face.setAttribute('fill', visible ? face.getAttribute('data-base-fill') : PAPER);
+  });
 }
 
 export const AtlasFunnel = forwardRef(function AtlasFunnel({
@@ -60,6 +64,10 @@ export const AtlasFunnel = forwardRef(function AtlasFunnel({
   const validData = useMemo(() => {
     validateData(data, variant);
     if (variant === 'branching') layoutGraph(data, validOptions);
+    if (variant === 'vertical') {
+      if (validOptions.verticalViews) isometricStageGeometry(data, { ...validOptions, ...validOptions.verticalViews.isometric });
+      else if (validOptions.verticalView === 'isometric') isometricStageGeometry(data, validOptions);
+    }
     if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) {
       throw new Error('Seed must be an integer between 0 and 4294967295.');
     }
@@ -82,7 +90,7 @@ export const AtlasFunnel = forwardRef(function AtlasFunnel({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const svg = renderFunnel(validData, { ...validOptions, variant, seed, idPrefix });
+    const svg = renderFunnel(validData, { ...validOptions, variant, seed, idPrefix, ...(variant === 'vertical' && validOptions.verticalView === undefined ? { verticalView: 'flat' } : {}) });
     svg.style.display = 'block';
     svg.style.height = 'auto';
     svgRef.current = svg;
