@@ -2,7 +2,7 @@
 
 Open `http://127.0.0.1:8000/lab/vertical-particles/` with `npm run dev` running. The main lab links to it as Particle study.
 
-This isolated tool previews falling particles between the existing vertical funnel containers. It uses seeded, staggered particle streams, with a quadratic acceleration curve implemented through CSS transforms. Each stream is clipped between the actual curved lower rim and next container's upper rim. Counts decrease with stage quantities; they illustrate flow rather than represent individual users.
+This isolated tool previews falling particles between the existing vertical funnel containers. Container lengths decrease with stage quantities, and the particle gaps follow the same layout. It uses seeded, staggered particle streams, with a quadratic acceleration curve implemented through CSS transforms. Each stream is clipped between the actual curved lower rim and next container's upper rim. Counts decrease with stage quantities; they illustrate flow rather than represent individual users.
 
 The supplied particle-study configuration is the starting preset and Reset study default: radius 0.6 px, count 124, fall time 540 ms, drift 0 px, inward edge angle 58°, and gap 14 px. `default-study.js` stores the complete approved configuration.
 

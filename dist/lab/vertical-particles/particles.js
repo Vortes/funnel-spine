@@ -1,12 +1,13 @@
 import {element,INK} from '../screens.js';
+import {verticalStageLayout} from '../vertical-layout.js';
 
 export function particleGaps(study){
   const {data,options,seed}=study.funnel,{size,count,duration,drift,edgeAngle=0}=study.particles;
-  const height=options.stageHeight/data.length,center=390,max=data[0].value||1;
+  const stages=verticalStageLayout(data,options.stageHeight,options.stageGap),center=390,max=data[0].value||1;
   let state=seed>>>0;
   const random=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
   return data.slice(1).map((next,i)=>{
-    const width=460*next.value/max,top=70+(i+1)*height-options.stageGap,bottom=70+(i+1)*height;
+    const width=460*next.value/max,bottom=stages[i+1].y,top=bottom-options.stageGap;
     const amount=width>size*2?Math.max(1,Math.round(count*width/460)):0;
     const edge=(x,curve)=>curve*(1-((x-center)/(width/2))**2);
     const points=Array.from({length:amount},(_,j)=>{

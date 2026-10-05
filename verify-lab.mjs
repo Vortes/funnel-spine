@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 globalThis.HTMLElement=class {};
 const {variants,createConfig,parseConfig,sampleData}=await import('./dist/lab/config.js');
 const {layoutGraph,renderFunnel,edgeFadeStops}=await import('./dist/lab/lab-engine.js');
+const {verticalStageLayout}=await import('./dist/lab/vertical-layout.js');
 for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=g.bottom+1e-8);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
 function verifySeparateRibbons(data,options={}){
  const before=JSON.stringify(data),g=layoutGraph(data,options);assert.equal(JSON.stringify(data),before);assert.equal(g.nodes.length,data.nodes.length);assert.equal(g.nodes.filter(n=>!n.incoming.length).length,1);for(const n of g.nodes){assert(n.incoming.length<=1);if(n.outgoing.length)assert.equal(n.outgoing.reduce((sum,l)=>sum+l.value,0),n.value);}assert.equal(g.nodes.filter(n=>!n.outgoing.length).reduce((sum,n)=>sum+n.value,0),g.total);assert.equal(g.links.length,data.links.length);g.links.forEach((l,i)=>assert.equal(l.value,data.links[i].value));
@@ -48,9 +49,17 @@ assert(fadedRibbons.slice(1,-1).every(path=>!path.attrs.mask));
 const singleRibbon=renderFunnel(createConfig('continuous').data.slice(0,2),{variant:'continuous',edgeFade:.35});
 assert.equal(singleRibbon.children.find(child=>child.attrs['data-key']).attrs.mask,'url(#atlas-fade-both)');
 const verticalData=createConfig('vertical').data;
+for(const seed of [0,1,1234,4294967295])for(const gap of [0,3,20])for(const height of [250,330]){
+ const stages=verticalStageLayout(sampleData('vertical',seed),height,gap);
+ assert.equal(stages[0].y,70);
+ assert(Math.abs(stages.at(-1).y+stages.at(-1).height-(70+height))<1e-8);
+ assert(stages.every((stage,i)=>stage.height>gap&&(!i||(stage.height<=stages[i-1].height+1e-8&&Math.abs(stage.y-stages[i-1].y-stages[i-1].height)<1e-8))));
+}
+const emptyStages=verticalStageLayout(verticalData.map(stage=>({...stage,value:0})),330,20);
+assert(emptyStages.every((stage,i)=>!i||Math.abs(stage.height-emptyStages[0].height)<1e-8));
 const square=renderFunnel(verticalData,{variant:'vertical',borderRadius:0});
 const rounded=renderFunnel(verticalData,{variant:'vertical',borderRadius:20});
 const ribbons=svg=>svg.children.filter(child=>child.attrs['data-key']);
 assert(ribbons(rounded).every((path,i)=>path.attrs.d!==ribbons(square)[i].attrs.d&&!path.attrs.d.includes('NaN')));
 for(const type of screenTypes){const order=screenOrder(type);assert.equal(order[0],type);assert.equal(new Set(order).size,6);}
-console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, edge fades, rounded vertical stages, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');
+console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, edge fades, decreasing vertical stage lengths, rounded vertical stages, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');
