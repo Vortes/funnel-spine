@@ -13,7 +13,11 @@ const stages = [
   { id: 'finish', label: 'Finish', value: 40 },
 ];
 
-assert.equal(renderToString(createElement(AtlasFunnel, { data: stages })), '<div style="display:block"></div>');
+const serverChart = renderToString(createElement(AtlasFunnel, { data: stages, options: { roughness: 0 } }));
+assert.match(serverChart, /<svg[^>]*viewBox="0 0 900 460"/);
+assert.match(serverChart, /data-key="entry"/);
+assert.match(serverChart, /<path[^>]*d="M /);
+assert.equal(globalThis.document, undefined, 'server rendering must not require a DOM');
 assert.throws(() => normalizeOptions({ color: 'red' }), /Unknown funnel option/);
 assert.throws(() => normalizeOptions({ constructor: 1 }), /Unknown funnel option/);
 assert.throws(() => normalizeOptions({ texture: 'sparse' }), /supported screen pattern/);
@@ -24,7 +28,8 @@ assert.throws(() => renderToString(createElement(AtlasFunnel, {
 })), /terminal taper/);
 const verticalConfig = createConfig('vertical');
 assert.equal(normalizeOptions(verticalConfig.options).isoDepth, verticalConfig.options.verticalViews.isometric.isoDepth);
-assert.equal(renderToString(createElement(AtlasFunnel, { data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 } })), '<div style="display:block"></div>');
+const serverVertical = renderToString(createElement(AtlasFunnel, { data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 } }));
+assert.match(serverVertical, /data-stage-face="entry"/);
 assert.throws(() => validateData([{ id: 1, label: 'Bad', value: 10 }, stages[1]]), /unique string id/);
 
 const dom = new JSDOM('<!doctype html><html><body><main id="app"></main></body></html>', { url: 'http://localhost' });
@@ -59,7 +64,7 @@ assert.equal(chartRef.querySelector('svg'), firstSvg);
 const path = chartRef.querySelector('[data-key="entry"]');
 assert(path);
 assert.equal(path.getAttribute('aria-pressed'), 'false');
-await act(async () => path.dispatchEvent(new dom.window.Event('focus')));
+await act(async () => path.dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
 assert.deepEqual(inspected, ['entry']);
 await act(async () => path.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })));
 assert.deepEqual(selected, [['entry', 40]]);
@@ -89,7 +94,7 @@ await act(async () => selectedLink.dispatchEvent(new dom.window.MouseEvent('clic
 assert.deepEqual(selected.at(-1), [null, null]);
 assert.equal(selectedLink.getAttribute('aria-pressed'), 'true');
 await act(async () => root.render(renderTree(tree, 'missing-key')));
-await act(async () => document.querySelector('#app [data-key]').dispatchEvent(new dom.window.Event('focus')));
+await act(async () => document.querySelector('#app [data-key]').dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
 assert.equal(inspected.at(-1), 'link:root:left');
 
 await act(async () => root.render(createElement(AtlasFunnel, { data: stages, variant: 'vertical' })));
@@ -109,5 +114,19 @@ await act(async () => root.render(createElement('section', null,
 const svgIds = [...document.querySelectorAll('svg')].map(svg => svg.querySelector('pattern').id);
 assert.equal(new Set(svgIds).size, 2);
 await act(async () => root.unmount());
+const hydrateHost = document.createElement('div');
+hydrateHost.innerHTML = serverChart;
+document.body.append(hydrateHost);
+const errors = [];
+const { hydrateRoot } = await import('react-dom/client');
+let hydrated;
+await act(async () => {
+  hydrated = hydrateRoot(hydrateHost, createElement(AtlasFunnel, { data: stages, options: { roughness: 0 } }), {
+    onRecoverableError: error => errors.push(error),
+  });
+});
+assert.deepEqual(errors, [], 'React should hydrate the server SVG without replacing it');
+assert(hydrateHost.querySelector('svg [data-key="entry"]'));
+await act(async () => hydrated.unmount());
 dom.window.close();
-console.log('Verified React SSR import, geometry options, DOM props and refs, isometric face selection, stable branching keys, and multiple SVG instances.');
+console.log('Verified React SVG SSR and hydration, geometry options, DOM props and refs, isometric face selection, stable branching keys, and multiple SVG instances.');

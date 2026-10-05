@@ -1,7 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { validateData } from '../../dist/core/data.js';
-import { renderFunnel } from '../../dist/lab/lab-engine.js';
 import { createConfig, parseConfig, sampleData, setVerticalControl, setVerticalView } from '../../dist/lab/config.js';
 import { PrintSettings } from './Controls';
 import { Details, type DetailView } from './Details';
@@ -145,15 +144,17 @@ function App() {
   }
 
   function exportSvg() {
-    const clone = renderFunnel(config.data, { ...config.options, variant, idPrefix: 'lab-export', seed: config.seed, stippleScale: 3 }) as SVGSVGElement;
+    const rendered = svgRef.current;
+    if (!rendered) return;
+    const clone = rendered.cloneNode(true) as SVGSVGElement;
+    clone.classList.remove('chart-intro', 'chart-intro--vertical', 'chart-intro--continuous', 'chart-intro--branching');
+    clone.querySelectorAll('.section-emphasis').forEach(path => path.remove());
     clone.querySelectorAll('[data-key]').forEach(path => {
       path.removeAttribute('tabindex');
       path.removeAttribute('role');
       path.removeAttribute('aria-pressed');
-      path.setAttribute('fill', path.getAttribute('data-base-fill')!);
-      path.removeAttribute('stroke-dasharray');
-      path.removeAttribute('data-base-fill');
     });
+    clone.querySelectorAll('.print-mark').forEach(mark => { mark.classList.remove('print-mark'); (mark as SVGElement).style.removeProperty('--print-step'); });
     clone.setAttribute('width', clone.getAttribute('viewBox')!.split(' ')[2]);
     clone.setAttribute('height', clone.getAttribute('viewBox')!.split(' ')[3]);
     download(new XMLSerializer().serializeToString(clone), `atlas-lab-${variant}.svg`, 'image/svg+xml');

@@ -1,6 +1,6 @@
 # React integration contract
 
-The package root exports one client component, `AtlasFunnel`. Its implementation and TypeScript declaration live in `dist/react/`. The component renders the lab's SVG engine in a container `div`. It does not require a stylesheet, Tailwind, shadcn/ui, or Recharts.
+The package root exports one client component, `AtlasFunnel`. Its source lives in `src/react/`; `dist/react/` contains the built module and generated declaration. Pure functions in `src/chart/` calculate geometry. React renders the SVG marks, patterns, labels, and interaction state inside a container `div`. It does not require a stylesheet, Tailwind, shadcn/ui, or Recharts.
 
 ## Inputs
 
@@ -40,14 +40,16 @@ const data = {
 <AtlasFunnel data={data} variant="branching" />
 ```
 
-`options` is a partial object. Unknown names, wrong types, and numbers outside the lab ranges throw errors. The shared defaults and exact ranges are in `dist/lab/options.js`. `texture: 'mixed'` distributes patterns across ribbons; `dense`, `am`, `hatch`, `cross`, and `coarse` each fill the whole chart with one pattern. Sparse stipple is reserved for Isometric top faces and is not a selectable chart texture. The fixed ink and paper colors are part of this design; `color` is not a public option. Pass `seed` (an unsigned 32-bit integer) for deterministic stipple and paper grain. Treat `data` as an immutable React prop; a new data object requests a redraw. Options are compared by value, so an inline `options` object with unchanged values does not redraw the SVG.
+`options` is a partial object. Unknown names, wrong types, and numbers outside the lab ranges throw errors. The shared defaults and exact ranges are in `dist/lab/options.js`. `texture: 'mixed'` distributes patterns across ribbons; `dense`, `am`, `hatch`, `cross`, and `coarse` each fill the whole chart with one pattern. Sparse stipple is reserved for Isometric top faces and is not a selectable chart texture. The fixed ink and paper colors are part of this design; `color` is not a public option. Pass `seed` (an unsigned 32-bit integer) for deterministic stipple and paper grain. Treat `data` as an immutable React prop; memoize large inputs when their contents have not changed.
 
-After validating a lab export and typing its fields in the consuming app, map it to the component:
+After validating a lab export, narrow its variant and data together before rendering. For example, the Vertical branch is:
 
 ```tsx
+import type { Stage } from 'funnel-spine';
+
 <AtlasFunnel
-  data={config.data}
-  variant={config.variant}
+  data={config.data as Stage[]}
+  variant="vertical"
   options={config.options}
   seed={config.seed}
 />
@@ -59,10 +61,10 @@ After validating a lab export and typing its fields in the consuming app, map it
 
 Click, Enter, or Space selects a ribbon. Escape clears selection. Use `defaultSelectedKey` for internal state or `selectedKey` plus `onSelectionChange(key, info)` for controlled state. A controlled component requests a change through the callback and waits for the parent to update `selectedKey`. `null` means no selection. Stage ribbon keys are their source stage IDs in continuous charts and stage IDs in vertical charts. Branching link keys are stable `link:<encoded source>:<encoded target>` strings, even when links are reordered. A selected link highlights its connected ancestry and descendants; this is a graph trace, not cohort attribution after a merge.
 
-The component forwards standard `div` attributes, including `className`, `style`, `aria-*`, `data-*`, and a `ref` to the container. Every SVG gets a React-generated pattern prefix so multiple charts can share a page. If an application renders multiple independent React roots on the server, configure each root's React `identifierPrefix` as React recommends.
+The component forwards standard `div` attributes, including `className`, `style`, `aria-*`, `data-*`, and a `ref` to the container. Its `viewBox` prop can crop the inner SVG, and SVG `children` can add an overlay. Every SVG gets a React-generated pattern prefix so multiple charts can share a page; `idPrefix` can set it explicitly for exported figures. If an application renders multiple independent React roots on the server, configure each root's React `identifierPrefix` as React recommends.
 
 ## Rendering and errors
 
-The module can be imported during server rendering. The server output is an empty `div`; SVG generation starts after hydration because the print engine uses DOM and optionally WebGL. The WebGL 2 stipple path falls back to vector SVG in browsers without WebGL 2. Invalid data or options throw during React rendering so an error boundary can report the problem. The SVG render itself may throw in the effect if the browser cannot create the required DOM elements.
+Server rendering includes the complete SVG, with deterministic vector print screens. Hydration starts from the same markup. In supporting browsers, the stipple screen upgrades through React state to a full-chart WebGL texture; otherwise the vector screen remains visible. Invalid data or options throw during React rendering so an error boundary can report the problem. Chart geometry and SVG creation do not depend on browser DOM APIs.
 
 The original `dist/atlas-kit-react.tsx` is a compatibility adapter for the legacy kit page. It has a different appearance and does not expose the lab options. New integrations should import the package root.

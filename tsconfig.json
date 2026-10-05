@@ -9,5 +9,5 @@
     "allowJs": true,
     "types": ["react"]
   },
-  "include": ["types.test.tsx", "src/lab/**/*.ts", "src/lab/**/*.tsx"]
+  "include": ["types.test.tsx", "src/chart/**/*.ts", "src/react/**/*.ts", "src/react/**/*.tsx", "src/lab/**/*.ts", "src/lab/**/*.tsx"]
 }

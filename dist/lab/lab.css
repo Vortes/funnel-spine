@@ -57,6 +57,7 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 
 .canvas .section-emphasis{opacity:0;transform:translate(var(--pull-x,0px),var(--pull-y,0px)) scale(1.015);transform-box:fill-box;transform-origin:center;pointer-events:none}
 .canvas .section-emphasis[data-emphasis=true]{opacity:1;transform:translate(var(--pull-x,0px),var(--pull-y,0px)) scale(1)}
+.canvas .section-emphasis[style*="--pull-x"]{opacity:1}
 @media(hover:hover) and (pointer:fine){
  .canvas[data-motion=pointer] .section-emphasis{transition:transform 110ms cubic-bezier(.215,.61,.355,1),opacity 110ms ease}
  .canvas[data-motion=pointer] .section-emphasis[data-emphasis=true]{transition:transform 90ms cubic-bezier(.215,.61,.355,1),opacity 150ms ease}
@@ -74,9 +75,9 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 .fade-hint{display:block;margin-top:7px;font:11px/1.4 ui-monospace,monospace;color:var(--muted)}
 .chart-intro--vertical .print-mark{animation:chart-print-in 300ms cubic-bezier(.32,.72,0,1) both;animation-delay:calc(var(--print-step)*70ms)}
 @keyframes chart-print-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-.chart-intro--continuous .print-wipe,.chart-intro--branching .print-wipe{transform-box:fill-box;transform-origin:left center;animation:chart-branch-in 680ms cubic-bezier(.25,.1,.25,1) both}
-@keyframes chart-branch-in{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-@media(prefers-reduced-motion:reduce){.chart-intro .print-mark,.chart-intro .print-wipe{animation:none}}
+.lab-reveal-cover{transform-box:fill-box;transform-origin:right center;animation:lab-reveal 680ms cubic-bezier(.25,.1,.25,1) both}
+@keyframes lab-reveal{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@media(prefers-reduced-motion:reduce){.chart-intro .print-mark{animation:none}.lab-reveal-cover{display:none}}
 @media(min-width:741px){
  .workspace>aside{align-self:stretch;min-height:0;padding:0}
  .sidebar-scroll{position:sticky;top:16px;height:min(900px,calc(100dvh - 265px));min-height:320px;padding:24px 22px;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}

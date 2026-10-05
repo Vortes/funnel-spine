@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { edgeFadeStops } from '../../dist/lab/lab-engine.js';
-import { screenLabels, screenSwatch, screenTypes } from '../../dist/lab/screens.js';
+import { edgeFadeStops } from '../chart/model';
+import { ScreenDefs } from '../react/ScreenDefs';
+import { screenLabels, screenTypes } from '../../dist/lab/screens.js';
 import type { LabOptions, Variant } from './types';
 
 type RangeRow = readonly [keyof LabOptions, string, number, number, number, string];
@@ -51,11 +52,14 @@ function display(value: number, unit: string) {
 }
 
 export function ScreenSwatch({ type, options, seed, idPrefix }: { type: string; options: LabOptions; seed: number; idPrefix: string }) {
-  const host = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    host.current?.replaceChildren(screenSwatch(type, { ...options, seed }, idPrefix));
-  }, [type, options, seed, idPrefix]);
-  return <span ref={host} aria-hidden="true" />;
+  return <span aria-hidden="true"><svg viewBox="0 0 32 24" width="32" height="24">
+    <ScreenDefs idPrefix={idPrefix} width={32} height={24} density={options.density} patternAngle={options.patternAngle}
+      dotGain={options.dotGain} roughness={options.roughness} seed={seed} />
+    {type === 'mixed' ? screenTypes.map((screen, index) => <rect key={screen} x={index * 32 / screenTypes.length}
+      width={32 / screenTypes.length} height={24} fill={`url(#${idPrefix}-${screen})`} />)
+      : <rect x=".5" y=".5" width="31" height="23" fill={`url(#${idPrefix}-${type})`} />}
+    <rect x=".5" y=".5" width="31" height="23" fill="none" stroke="#2F4FE0" strokeWidth=".65" />
+  </svg></span>;
 }
 
 function RangeControl({ row, value, onChange }: { row: RangeRow; value: number; onChange: (value: number) => void }) {

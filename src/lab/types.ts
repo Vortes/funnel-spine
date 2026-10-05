@@ -1,4 +1,5 @@
-import type { FunnelData, FunnelOptions, FunnelVariant, Inspection } from '../../dist/react/atlas-funnel';
+import type { FunnelOptions, FunnelVariant, Inspection } from '../react/AtlasFunnel';
+import type { FunnelData } from '../chart/model';
 
 export type Variant = FunnelVariant;
 export type LabOptions = Required<Omit<FunnelOptions, 'mirror' | 'verticalView' | 'verticalViews' | 'isoDepth' | 'isoRotation'>> &
@@ -13,12 +14,7 @@ export type LabConfig = {
 };
 export type SavedConfig = { name: string; config: LabConfig };
 export type PathInfo = Inspection;
-export type LabPath = SVGPathElement & { atlasInfo: PathInfo; atlasEmphasis?: SVGPathElement };
-export type LabSvg = SVGSVGElement & {
-  atlasLayout?: { links: { id: string; source: string; target: string }[] };
-  atlasClearPull?: () => void;
-  atlasHighlightedKey?: string | null;
-};
+export type LabSvg = SVGSVGElement;
 
 export type ParticleStudy = {
   version: 1;

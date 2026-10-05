@@ -1,9 +1,9 @@
-import { useEffect, useRef, type RefObject } from 'react';
-import { renderFunnel } from '../../dist/lab/lab-engine.js';
-import { element, INK, PAPER } from '../../dist/lab/screens.js';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { AtlasFunnel } from '../react/AtlasFunnel';
+import { buildChartModel, type FunnelGraph, type Stage } from '../chart/model';
 import { ScreenLegend } from './Controls';
 import { format, percent } from './utils';
-import type { LabConfig, LabPath, LabSvg, PathInfo, Variant } from './types';
+import type { LabConfig, LabSvg, PathInfo, Variant } from './types';
 
 const titles: Record<Variant, string> = { continuous: 'Continuous funnel', vertical: 'Vertical funnel', branching: 'Branching funnel' };
 const captions = {
@@ -12,85 +12,30 @@ const captions = {
   branching: '03 / Connected buckets · every split distributes 100%',
 };
 
-function paths(svg: LabSvg): LabPath[] {
-  return [...svg.querySelectorAll<SVGPathElement>('[data-key]')] as LabPath[];
-}
-
-function highlight(svg: LabSvg, info: PathInfo | null, selectedKey: string | null) {
-  svg.atlasClearPull?.();
-  svg.atlasHighlightedKey = info?.key ?? null;
-  const linked = new Set<string>();
-  if (info?.kind === 'link' && svg.atlasLayout) {
-    const links = svg.atlasLayout.links;
-    const traverse = (id: string, upstream: boolean, seen = new Set<string>()) => {
-      if (seen.has(id)) return;
-      seen.add(id);
-      links.filter(link => upstream ? link.target === id : link.source === id).forEach(link => {
-        linked.add(link.id);
-        traverse(upstream ? link.source : link.target, upstream, seen);
-      });
-    };
-    linked.add(info.key);
-    traverse(info.source!, true);
-    traverse(info.target!, false);
-  }
-  paths(svg).forEach(path => {
-    const active = !info || (info.kind === 'link' ? linked.has(path.atlasInfo.key) : path.atlasInfo.key === info.key);
-    path.setAttribute('fill', active ? path.getAttribute('data-base-fill')! : PAPER);
-    if (active) path.removeAttribute('stroke-dasharray');
-    else path.setAttribute('stroke-dasharray', '2 4');
-    path.setAttribute('aria-pressed', String(selectedKey === path.atlasInfo.key));
-    path.atlasEmphasis?.setAttribute('data-emphasis', String(Boolean(info) && active));
+function attachProximity(svg: SVGSVGElement, canvas: HTMLDivElement, axis: 'x' | 'y') {
+  const sections = [...svg.querySelectorAll<SVGPathElement>('path[data-key]')];
+  if (typeof svg.createSVGPoint !== 'function' || sections.some(path => typeof path.getTotalLength !== 'function')) return () => {};
+  const contours = sections.map(path => {
+    const length = path.getTotalLength(), count = Math.max(1, Math.ceil(length / 12));
+    return { path, bounds: path.getBBox(), points: Array.from({ length: count + 1 }, (_, index) => path.getPointAtLength(length * index / count)) };
   });
-  svg.querySelectorAll('[data-stage-face]').forEach(face => {
-    const active = !info || face.getAttribute('data-stage-face') === info.key;
-    face.setAttribute('fill', active ? face.getAttribute('data-base-fill')! : PAPER);
-  });
-}
-
-function attachProximity(svg: LabSvg, sections: LabPath[], canvas: HTMLDivElement, axis: 'x' | 'y', selected: RefObject<string | null>, hover: RefObject<PathInfo | null>, onInspect: (info: PathInfo | null) => void) {
-  const radius = 24;
   let pulled: SVGPathElement | null = null;
-  svg.atlasClearPull = () => {
+  const clear = () => {
     pulled?.style.removeProperty('--pull-x');
     pulled?.style.removeProperty('--pull-y');
     pulled = null;
   };
-  svg.addEventListener('pointerleave', event => {
-    if (event.pointerType !== 'mouse') return;
-    hover.current = null;
-    const pinned = sections.find(path => path.atlasInfo.key === selected.current)?.atlasInfo ?? null;
-    highlight(svg, pinned, selected.current);
-    if (pinned) onInspect(pinned);
-  });
-  if (typeof svg.createSVGPoint !== 'function' || sections.some(path => typeof path.getTotalLength !== 'function')) return;
-  const contours = sections.map(path => {
-    const length = path.getTotalLength();
-    const count = Math.max(1, Math.ceil(length / 12));
-    return { path, bounds: path.getBBox(), points: Array.from({ length: count + 1 }, (_, index) => path.getPointAtLength(length * index / count)) };
-  });
-  const show = (info: PathInfo | null) => {
-    if (svg.atlasHighlightedKey === (info?.key ?? null)) return;
-    hover.current = info;
-    highlight(svg, info, null);
-    if (info) onInspect(info);
-  };
-  svg.addEventListener('pointermove', event => {
-    if (event.pointerType !== 'mouse' || selected.current || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  const move = (event: PointerEvent) => {
+    if (event.pointerType !== 'mouse' || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
     canvas.dataset.motion = 'pointer';
-    const section = (event.target as Element).closest('path[data-key]') as LabPath | null;
-    if (section) {
-      svg.atlasClearPull?.();
-      show(section.atlasInfo);
-      return;
-    }
+    if ((event.target as Element).closest('path[data-key]')) { clear(); return; }
     const matrix = svg.getScreenCTM();
     if (!matrix) return;
     const point = svg.createSVGPoint();
     point.x = event.clientX;
     point.y = event.clientY;
-    const cursor = point.matrixTransform(matrix.inverse());
-    let nearest: { path: LabPath; dx: number; dy: number; distance: number } | null = null;
+    const cursor = point.matrixTransform(matrix.inverse()), radius = 24;
+    let nearest: { path: SVGPathElement; dx: number; dy: number; distance: number } | null = null;
     for (const { path, bounds, points } of contours) {
       if (cursor.x < bounds.x - radius || cursor.x > bounds.x + bounds.width + radius || cursor.y < bounds.y - radius || cursor.y > bounds.y + bounds.height + radius) continue;
       for (let index = 1; index < points.length; index++) {
@@ -102,168 +47,92 @@ function attachProximity(svg: LabSvg, sections: LabPath[], canvas: HTMLDivElemen
         if (!nearest || distance < nearest.distance) nearest = { path, dx, dy, distance };
       }
     }
-    if (!nearest || nearest.distance >= radius * radius) { show(null); return; }
-    show(nearest.path.atlasInfo);
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { svg.atlasClearPull?.(); return; }
+    if (!nearest || nearest.distance >= radius * radius || matchMedia('(prefers-reduced-motion: reduce)').matches) { clear(); return; }
+    const emphasis = [...svg.querySelectorAll<SVGPathElement>('.section-emphasis')].find(path => path.dataset.emphasisKey === nearest!.path.dataset.key);
+    if (!emphasis) { clear(); return; }
     const distance = Math.sqrt(nearest.distance), offset = axis === 'x' ? nearest.dx : nearest.dy;
     const pull = Math.sign(offset) * Math.min(5, Math.abs(offset) * 2) * (1 - distance / radius);
-    const emphasis = nearest.path.atlasEmphasis!;
-    if (pulled && pulled !== emphasis) svg.atlasClearPull?.();
+    if (pulled !== emphasis) clear();
     emphasis.style.setProperty('--pull-x', `${axis === 'x' ? pull : 0}px`);
     emphasis.style.setProperty('--pull-y', `${axis === 'y' ? pull : 0}px`);
     pulled = emphasis;
-  });
-}
-
-function printEntrance(svg: LabSvg, variant: Variant) {
-  svg.classList.add('chart-intro', `chart-intro--${variant}`);
-  const ribbons = paths(svg);
-  if (variant === 'vertical') {
-    const steps = new Map(ribbons.map((path, index) => [path.atlasInfo.key, index]));
-    ribbons.forEach((path, index) => {
-      path.classList.add('print-mark');
-      path.style.setProperty('--print-step', String(index));
-    });
-    svg.querySelectorAll<SVGElement>('[data-stage-face],[data-stage-outline]').forEach(face => {
-      const key = face.getAttribute('data-stage-face') ?? face.getAttribute('data-stage-outline');
-      face.classList.add('print-mark');
-      face.style.setProperty('--print-step', String(steps.get(key ?? '') ?? 0));
-    });
-    return;
-  }
-  const [, , width, height] = svg.getAttribute('viewBox')!.split(' ').map(Number);
-  const id = 'lab-figure-print-wipe';
-  const clip = element('clipPath', { id, clipPathUnits: 'userSpaceOnUse' });
-  clip.append(element('rect', { x: 0, y: 0, width, height, class: 'print-wipe' }));
-  const defs = element('defs');
-  defs.append(clip);
-  svg.prepend(defs);
-  const otherMarks = variant === 'branching'
-    ? [...svg.querySelectorAll(':scope > rect')].slice(1)
-    : [...svg.querySelectorAll('[data-ink-baseline]')];
-  for (const node of [...ribbons, ...otherMarks]) {
-    node.setAttribute('clip-path', `url(#${id})`);
-    (node as LabPath).atlasEmphasis?.setAttribute('clip-path', `url(#${id})`);
-  }
+  };
+  svg.addEventListener('pointermove', move);
+  svg.addEventListener('pointerleave', clear);
+  return () => { svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerleave', clear); clear(); };
 }
 
 function FunnelCanvas({ config, introToken, selectedKey, onSelect, onInspect, onPathsChange, onRenderError, svgRef }: {
-  config: LabConfig;
-  introToken: number;
-  selectedKey: string | null;
-  onSelect: (key: string | null) => void;
-  onInspect: (info: PathInfo | null) => void;
-  onPathsChange: (infos: PathInfo[]) => void;
-  onRenderError: (error: string | null) => void;
+  config: LabConfig; introToken: number; selectedKey: string | null;
+  onSelect: (key: string | null) => void; onInspect: (info: PathInfo | null) => void;
+  onPathsChange: (infos: PathInfo[]) => void; onRenderError: (error: string | null) => void;
   svgRef: RefObject<LabSvg | null>;
 }) {
-  const host = useRef<HTMLDivElement>(null);
-  const hover = useRef<PathInfo | null>(null);
-  const lastIntro = useRef(0);
-  const selected = useRef(selectedKey);
-  selected.current = selectedKey;
-
-  useEffect(() => {
-    const canvas = host.current!;
+  const canvas = useRef<HTMLDivElement>(null), chart = useRef<HTMLDivElement>(null), lastIntro = useRef(0);
+  const [reveal, setReveal] = useState<number | null>(null);
+  const result = useMemo(() => {
     try {
-      const svg = renderFunnel(config.data, { ...config.options, variant: config.variant, idPrefix: 'lab-figure', seed: config.seed }) as LabSvg;
-      svgRef.current = svg;
-      canvas.replaceChildren(svg);
-      canvas.dataset.motion = 'instant';
-      hover.current = null;
-      const ribbons = paths(svg);
-      ribbons.forEach(path => {
-        const emphasis = element('path', {
-          d: path.getAttribute('d')!, fill: 'none', stroke: INK, 'stroke-width': 1,
-          'vector-effect': 'non-scaling-stroke', opacity: 0, class: 'section-emphasis',
-          'aria-hidden': 'true', 'pointer-events': 'none', 'data-emphasis': 'false',
-        }) as SVGPathElement;
-        if (path.hasAttribute('mask')) emphasis.setAttribute('mask', path.getAttribute('mask')!);
-        if (path.hasAttribute('clip-path')) emphasis.setAttribute('clip-path', path.getAttribute('clip-path')!);
-        path.atlasEmphasis = emphasis;
-        svg.append(emphasis);
-        const preview = () => {
-          if (selected.current) return;
-          hover.current = path.atlasInfo;
-          highlight(svg, path.atlasInfo, null);
-          onInspect(path.atlasInfo);
-        };
-        const restore = () => {
-          hover.current = null;
-          const pinned = ribbons.find(item => item.atlasInfo.key === selected.current)?.atlasInfo ?? null;
-          highlight(svg, pinned, selected.current);
-          onInspect(pinned);
-        };
-        const choose = () => {
-          const key = selected.current === path.atlasInfo.key ? null : path.atlasInfo.key;
-          selected.current = key;
-          onSelect(key);
-          onInspect(path.atlasInfo);
-        };
-        path.addEventListener('pointerenter', event => {
-          if (event.pointerType !== 'mouse' || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-          canvas.dataset.motion = 'pointer';
-          preview();
-        });
-        path.addEventListener('pointerdown', event => { canvas.dataset.motion = event.pointerType === 'mouse' ? 'pointer' : 'instant'; });
-        path.addEventListener('focus', () => { canvas.dataset.motion = 'instant'; preview(); });
-        path.addEventListener('blur', () => { canvas.dataset.motion = 'instant'; restore(); });
-        path.addEventListener('click', choose);
-        path.addEventListener('keydown', event => {
-          canvas.dataset.motion = 'instant';
-          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); }
-          if (event.key === 'Escape') { selected.current = null; onSelect(null); highlight(svg, null, null); onInspect(path.atlasInfo); }
-        });
-      });
-      attachProximity(svg, ribbons, canvas, config.variant === 'vertical' ? 'y' : 'x', selected, hover, onInspect);
-      const infos = ribbons.map(path => path.atlasInfo);
-      onPathsChange(infos);
-      onRenderError(null);
-      const pinned = infos.find(info => info.key === selected.current) ?? null;
-      highlight(svg, pinned, selected.current);
-      if (selected.current && !pinned) onSelect(null);
-      if (introToken > lastIntro.current) {
-        printEntrance(svg, config.variant);
-        lastIntro.current = introToken;
-      }
-      return () => { svgRef.current = null; svg.remove(); };
+      const model = buildChartModel(config.data, config.variant, config.options);
+      return { infos: model.marks.flatMap(mark => 'inspection' in mark && mark.inspection ? [mark.inspection] : []) as PathInfo[], width: model.width, height: model.height, error: null };
     } catch (error) {
-      svgRef.current = null;
-      canvas.replaceChildren();
-      onPathsChange([]);
-      onRenderError(error instanceof Error ? error.message : String(error));
+      return { infos: [] as PathInfo[], width: 0, height: 0, error: error instanceof Error ? error.message : String(error) };
     }
-  }, [config, introToken, onSelect, onInspect, onPathsChange, onRenderError, svgRef]);
-
-  useEffect(() => {
+  }, [config]);
+  useEffect(() => { onPathsChange(result.infos); onRenderError(result.error); }, [result, onPathsChange, onRenderError]);
+  useLayoutEffect(() => {
+    const svg = chart.current?.querySelector('svg') ?? null;
+    svgRef.current = svg;
+    if (!svg || !canvas.current) return;
+    canvas.current.dataset.motion = 'instant';
+    const detach = attachProximity(svg, canvas.current, config.variant === 'vertical' ? 'y' : 'x');
+    return () => { detach(); svgRef.current = null; };
+  }, [config, result.error, svgRef]);
+  useLayoutEffect(() => {
     const svg = svgRef.current;
-    if (!svg) return;
-    const info = paths(svg).find(path => path.atlasInfo.key === selectedKey)?.atlasInfo ?? hover.current;
-    highlight(svg, info, selectedKey);
-  }, [selectedKey, svgRef]);
-
-  return <div id="canvas" className="canvas" tabIndex={-1} ref={host} />;
+    if (!svg || introToken <= lastIntro.current) return;
+    lastIntro.current = introToken;
+    if (config.variant !== 'vertical') {
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setReveal(introToken);
+      return;
+    }
+    svg.classList.add('chart-intro', `chart-intro--${config.variant}`);
+    const steps = new Map([...svg.querySelectorAll<SVGPathElement>('path[data-key]')].map((path, index) => [path.dataset.key, index]));
+    svg.querySelectorAll<SVGElement>('path[data-key],[data-stage-face],[data-stage-outline]').forEach(mark => {
+      mark.classList.add('print-mark');
+      const key = mark.getAttribute('data-key') ?? mark.getAttribute('data-stage-face') ?? mark.getAttribute('data-stage-outline');
+      mark.style.setProperty('--print-step', String(steps.get(key ?? '') ?? 0));
+    });
+  }, [introToken, config, svgRef]);
+  useEffect(() => {
+    if (reveal === null) return;
+    const timeout = setTimeout(() => setReveal(null), 720);
+    return () => clearTimeout(timeout);
+  }, [reveal]);
+  const shared = { ref: chart, options: config.options, seed: config.seed, selectedKey,
+    onSelectionChange: onSelect, onInspect };
+  const cover = reveal !== null && config.variant !== 'vertical'
+    ? <rect key={reveal} className="lab-reveal-cover" x={0} y={0} width={result.width} height={result.height}
+      fill="#E4E5E8" pointerEvents="none" onAnimationEnd={() => setReveal(null)} />
+    : null;
+  return <div id="canvas" className="canvas" tabIndex={-1} ref={canvas}>
+    {!result.error && (config.variant === 'branching'
+      ? <AtlasFunnel {...shared} key="branching" data={config.data as FunnelGraph} variant="branching">{cover}</AtlasFunnel>
+      : config.variant === 'continuous'
+        ? <AtlasFunnel {...shared} key="continuous" data={config.data as readonly Stage[]} variant="continuous">{cover}</AtlasFunnel>
+        : <AtlasFunnel {...shared} key="vertical" data={config.data as readonly Stage[]} variant="vertical" />)}
+  </div>;
 }
 
 export function FigurePanel({ config, introToken, selectedKey, inspected, infos, error, svgRef, onSelect, onInspect, onPathsChange, onRenderError, onExport }: {
-  config: LabConfig;
-  introToken: number;
-  selectedKey: string | null;
-  inspected: PathInfo | null;
-  infos: PathInfo[];
-  error: string | null;
-  svgRef: RefObject<LabSvg | null>;
-  onSelect: (key: string | null) => void;
-  onInspect: (info: PathInfo | null) => void;
-  onPathsChange: (infos: PathInfo[]) => void;
-  onRenderError: (error: string | null) => void;
-  onExport: () => void;
+  config: LabConfig; introToken: number; selectedKey: string | null; inspected: PathInfo | null;
+  infos: PathInfo[]; error: string | null; svgRef: RefObject<LabSvg | null>;
+  onSelect: (key: string | null) => void; onInspect: (info: PathInfo | null) => void;
+  onPathsChange: (infos: PathInfo[]) => void; onRenderError: (error: string | null) => void; onExport: () => void;
 }) {
   const index = ['vertical', 'continuous', 'branching'].indexOf(config.variant);
   const active = infos.find(info => info.key === selectedKey) ?? inspected ?? infos[0] ?? null;
   const caption = config.variant === 'vertical' ? captions.vertical[config.options.verticalView ?? 'flat']
-    : config.variant === 'continuous' ? captions.continuous[config.options.mirror ? 'mirrored' : 'half']
-      : captions.branching;
+    : config.variant === 'continuous' ? captions.continuous[config.options.mirror ? 'mirrored' : 'half'] : captions.branching;
   return <section className="figure">
     <div className="figure-head"><div>
       <span id="figure-number" className="overline">FIG. 00{index + 1}</span>

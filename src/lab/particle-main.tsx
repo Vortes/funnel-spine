@@ -1,14 +1,16 @@
 import { createRoot } from 'react-dom/client';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { renderFunnel } from '../../dist/lab/lab-engine.js';
+import { AtlasFunnel } from '../react/AtlasFunnel';
+import type { Stage } from '../chart/model';
 import { createStudy, parseStudy } from '../../dist/lab/vertical-particles/study-config.js';
-import { addParticles, particleGaps } from '../../dist/lab/vertical-particles/particles.js';
-import { roundContainers } from '../../dist/lab/vertical-particles/containers.js';
-import { animateTransfer } from '../../dist/lab/vertical-particles/motion.js';
+import { particleGaps } from '../../dist/lab/vertical-particles/particles.js';
+import { containerFrame, particleFrame } from '../../dist/lab/vertical-particles/motion.js';
 import { download } from './utils';
 import type { ParticleStudy } from './types';
 
 type ParticleKey = keyof ParticleStudy['particles'];
+type ParticlePoint = { x: number; y: number; dx: number; dy: number; sourceHeight: number; duration: number; phase: number };
+type ParticleGap = { points: ParticlePoint[] };
 type ContainerKey = 'stageGap' | 'capCurve' | 'cornerRadius';
 type Slider = { key: ParticleKey | ContainerKey; label: string; min: number; max: number; step: number; format: (value: number) => string };
 
@@ -37,32 +39,89 @@ function StudyRange({ slider, value, onChange }: { slider: Slider; value: number
 }
 
 function ParticlePreview({ study, paused, reduced, hostRef }: { study: ParticleStudy; paused: boolean; reduced: boolean; hostRef: RefObject<HTMLDivElement | null> }) {
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const motionRef = useRef<ReturnType<typeof animateTransfer> | null>(null);
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const animations = useRef<Animation[]>([]);
+  const gaps = useMemo(() => particleGaps(study) as ParticleGap[], [study]);
+  const funnelOptions = useMemo(() => {
+    const { cornerRadius, ...options } = study.funnel.options;
+    return { ...options, verticalView: 'flat' as const, borderRadius: cornerRadius };
+  }, [study.funnel.options]);
   useEffect(() => {
-    const svg = renderFunnel(study.funnel.data, { ...study.funnel.options, variant: 'vertical', verticalView: 'flat', seed: study.funnel.seed, idPrefix: 'particle-study' }) as SVGSVGElement;
-    svg.querySelectorAll('[data-key]').forEach(path => { path.removeAttribute('tabindex'); path.removeAttribute('role'); });
-    svg.setAttribute('viewBox', study.funnel.options.labels ? '0 50 900 380' : '130 50 520 380');
-    roundContainers(svg, study);
-    hostRef.current?.replaceChildren(svg);
-    svgRef.current = svg;
-    return () => { svgRef.current = null; svg.remove(); };
-  }, [study.funnel, hostRef]);
-  useEffect(() => {
-    const svg = svgRef.current;
+    const svg = chartRef.current?.querySelector('svg');
     if (!svg) return;
-    const gaps = addParticles(svg, study);
-    const motion = animateTransfer(svg, study, gaps);
-    motionRef.current = motion;
-    motion.setReducedMotion(reduced);
-    motion.setPaused(paused);
-    return () => { motion.dispose(); motionRef.current = null; };
-  }, [study]);
+    if (reduced) return;
+    const started = Number(document.timeline.currentTime ?? 0);
+    const sample = (duration: number, frame: (time: number) => Keyframe): Keyframe[] => {
+      const length = Math.max(2, Math.ceil(duration / 12) + 1);
+      return Array.from({ length }, (_, index) => ({ ...frame(duration * index / (length - 1)), offset: index / (length - 1) }));
+    };
+    const animate = (node: Element, frames: Keyframe[], duration: number, phase = 0) => {
+      const animation = node.animate(frames, { duration, iterations: Infinity, easing: 'linear' });
+      animation.startTime = started - phase * duration;
+      animations.current.push(animation);
+    };
+    for (const [gapIndex, gap] of gaps.entries()) {
+      gap.points.forEach((point, index) => {
+        const dot = svg.querySelector<SVGCircleElement>(`[data-gap="${gapIndex}"][data-particle="${index}"]`);
+        if (!dot) return;
+        animate(dot, sample(point.duration, time => {
+          const frame = particleFrame(study, point, time);
+          return { transform: `translate(${frame.x}px,${frame.y}px) scale(${frame.sx},${frame.sy})`, opacity: frame.opacity };
+        }), point.duration, point.phase);
+        const mark = svg.querySelector<SVGEllipseElement>(`[data-gap="${gapIndex}"][data-absorption="${index}"]`);
+        if (mark && study.particles.absorption) {
+          animate(mark, sample(point.duration, time => {
+            const hit = point.duration * Math.sqrt(Math.max(0, (point.dy - 2 * study.particles.size) / point.dy));
+            const age = (time - hit + point.duration) % point.duration;
+            const window = Math.min(180, point.duration * .45);
+            const strength = age < window ? study.particles.absorption * Math.sin(Math.PI * age / window) ** 2 : 0;
+            return { opacity: strength, transform: `translateY(${strength}px) scale(${1 + strength * .8},${1 - strength * .65})` };
+          }), point.duration, point.phase);
+        }
+      });
+    }
+    svg.querySelectorAll<SVGPathElement>('path[data-key]').forEach((path, index) => {
+      path.classList.add('transfer-container');
+      const outgoing = gaps[index]?.points[Math.floor(gaps[index]?.points.length / 2)];
+      const incoming = gaps[index - 1]?.points[Math.floor(gaps[index - 1]?.points.length / 2)];
+      const representative = outgoing ?? incoming;
+      if (!representative) return;
+      const duration = representative.duration;
+      animate(path, sample(duration, time => {
+        const frame = containerFrame(study, gaps, index, time);
+        return { transform: `translateY(${frame.shift}px) scaleY(${frame.scale})` };
+      }), duration, representative.phase);
+    });
+    if (paused) animations.current.forEach(animation => animation.pause());
+    return () => { animations.current.forEach(animation => animation.cancel()); animations.current = []; };
+  }, [study, gaps, reduced]);
   useEffect(() => {
-    motionRef.current?.setReducedMotion(reduced);
-    motionRef.current?.setPaused(paused);
+    animations.current.forEach(animation => {
+      if (paused || reduced) animation.pause();
+      else animation.play();
+    });
   }, [paused, reduced]);
-  return <div id="preview" ref={hostRef} data-paused={String(paused)} />;
+  return <div id="preview" ref={hostRef} data-paused={String(paused)}>
+    <AtlasFunnel ref={chartRef} data={study.funnel.data as readonly Stage[]} variant="vertical"
+      options={funnelOptions}
+      seed={study.funnel.seed} idPrefix="particle-study" style={{ width: '100%' }}
+      viewBox={study.funnel.options.labels ? '0 50 900 380' : '130 50 520 380'}>
+      <g data-particle-layer="" aria-hidden="true" pointerEvents="none">
+        {gaps.map((gap, gapIndex) => <g key={gapIndex} data-gap={gapIndex}>
+          {gap.points.map((point, index) => <g key={index}>
+            <circle data-gap={gapIndex} data-particle={index} cx={point.x} cy={point.y} r={study.particles.size}
+              fill="#2F4FE0" className="falling-particle"
+              style={{ transformOrigin: `${point.x}px ${point.y}px`, transformBox: 'view-box',
+                ...(reduced ? { transform: `translate(${point.dx * .5}px,${point.dy * .5}px)` } : {}) }} />
+            <ellipse data-gap={gapIndex} data-absorption={index} cx={point.x + point.dx}
+              cy={point.y + point.dy - study.particles.size * 2} rx={study.particles.size} ry={study.particles.size * .35}
+              fill="#2F4FE0" className="absorption-mark" opacity={0}
+              style={{ transformOrigin: `${point.x + point.dx}px ${point.y + point.dy - study.particles.size * 2}px`, transformBox: 'view-box' }} />
+          </g>)}
+        </g>)}
+      </g>
+    </AtlasFunnel>
+  </div>;
 }
 
 function App() {

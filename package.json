@@ -11,13 +11,10 @@
     }
   },
   "files": [
-    "dist/core/data.js",
-    "dist/lab/lab-engine.js",
-    "dist/lab/options.js",
-    "dist/lab/screens.js",
-    "dist/lab/stipple-shader.js",
     "dist/react/atlas-funnel.js",
-    "dist/react/atlas-funnel.d.ts",
+    "dist/react/atlas-funnel.js.map",
+    "dist/react/*.d.ts",
+    "docs/react-chart-architecture.md",
     "docs/react-integration.md",
     "docs/launch-readiness.md"
   ],
@@ -30,7 +27,8 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build:lab": "node scripts/build-lab.mjs",
-    "check": "npm run build:lab && node verify.mjs && node verify-lab.mjs && node verify-particles.mjs && node verify-react.mjs && node verify-lab-ui.mjs && npm run typecheck",
+    "build:package": "node scripts/build-package.mjs",
+    "check": "npm run build:package && npm run build:lab && node verify.mjs && node verify-lab.mjs && node verify-particles.mjs && node verify-chart-model.mjs && node verify-react-screens.mjs && node verify-react.mjs && node verify-lab-ui.mjs && npm run typecheck",
     "typecheck": "tsc --noEmit",
     "test": "npm run check"
   },
