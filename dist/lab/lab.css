@@ -64,3 +64,6 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 
 .figure-actions{display:flex;align-items:center;gap:16px}.figure-actions a{font-size:12px;text-decoration:underline;text-underline-offset:4px}
 @media(max-width:740px){.figure-head{flex-wrap:wrap;gap:12px}.figure-actions{flex-wrap:wrap;gap:12px}}
+.fade-preview{height:14px;margin-top:7px;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 5px);pointer-events:none;user-select:none}
+.control--fade input[type=range]{height:40px}
+.fade-hint{display:block;margin-top:7px;font:11px/1.4 ui-monospace,monospace;color:var(--muted)}

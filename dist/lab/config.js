@@ -3,8 +3,8 @@ import {layoutGraph} from './lab-engine.js';
 import {screenTypes} from './screens.js';
 import {defaultConfigs} from './default-configs.js';
 export const variants=['continuous','vertical','branching'];
-export const ranges={density:[3,14],strokeWidth:[.25,.75],patternAngle:[-90,90],dotGain:[-.8,.2],roughness:[0,.6],fontSize:[12,18],curve:[.1,.8],chartHeight:[120,265],edgeFade:[0,1],stageHeight:[250,330],stageGap:[0,20],capCurve:[0,20],borderRadius:[0,18],tailRatio:[.15,1],nodeGap:[28,85],nodeWidth:[1,6]};
-export const defaultOptions={texture:'mixed',density:6,strokeWidth:.5,patternAngle:-45,dotGain:.03,roughness:.15,paperGrain:false,fontSize:14,labels:true,guides:true,curve:.5,chartHeight:235,stageHeight:310,stageGap:9,capCurve:12,tailRatio:.65,nodeGap:66,nodeWidth:2.5};
+export const ranges={density:[3,14],strokeWidth:[.25,.75],patternAngle:[-90,90],dotGain:[-.8,.2],roughness:[0,.6],fontSize:[12,18],curve:[.1,.8],chartHeight:[120,265],edgeFade:[0,.45],stageHeight:[250,330],stageGap:[0,20],capCurve:[0,20],borderRadius:[0,20],tailRatio:[.15,1],nodeGap:[28,85],nodeWidth:[1,6]};
+export const defaultOptions={texture:'mixed',density:6,strokeWidth:.5,patternAngle:-45,dotGain:.03,roughness:.15,paperGrain:false,fontSize:14,labels:true,guides:true,curve:.5,chartHeight:235,edgeFade:0,stageHeight:310,stageGap:9,capCurve:12,borderRadius:0,tailRatio:.65,nodeGap:66,nodeWidth:2.5};
 export function sampleData(variant,seed){
  let a=seed>>>0;const random=()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};
  const total=10000+Math.round(random()*5000/100)*100;

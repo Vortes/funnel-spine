@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
 globalThis.HTMLElement=class {};
 const {variants,createConfig,parseConfig,sampleData}=await import('./dist/lab/config.js');
-const {layoutGraph}=await import('./dist/lab/lab-engine.js');
-const {verticalContainerGeometry}=await import('./dist/lab/vertical-geometry.js');
+const {layoutGraph,renderFunnel,edgeFadeStops,verticalRimGeometry}=await import('./dist/lab/lab-engine.js');
 for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=g.bottom+1e-8);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
 const vertical=createConfig('vertical');assert.equal(vertical.options.stageGap,4);assert.equal(vertical.options.tailRatio,.6);assert.equal(vertical.options.borderRadius,4);assert.equal(vertical.options.edgeFade,0);
-const rounded=verticalContainerGeometry(vertical.data,vertical.options,0);assert.equal(rounded.radius,4);assert.equal(rounded.bottom,70+330/vertical.data.length-4);assert(rounded.topLeft>160&&rounded.topRight<620);
+const presetRims=verticalRimGeometry(vertical.data,vertical.options);assert.equal(presetRims.radii[0],4);assert(presetRims.widths.every((width,i)=>!i||width<=presetRims.widths[i-1]));
 const previousVertical=structuredClone(vertical);delete previousVertical.options.borderRadius;assert.equal(parseConfig(previousVertical).options.borderRadius,0);
 function verifySeparateRibbons(data,options={}){
  const before=JSON.stringify(data),g=layoutGraph(data,options);assert.equal(JSON.stringify(data),before);assert.equal(g.nodes.length,data.nodes.length);assert.equal(g.nodes.filter(n=>!n.incoming.length).length,1);for(const n of g.nodes){assert(n.incoming.length<=1);if(n.outgoing.length)assert.equal(n.outgoing.reduce((sum,l)=>sum+l.value,0),n.value);}assert.equal(g.nodes.filter(n=>!n.outgoing.length).reduce((sum,n)=>sum+n.value,0),g.total);assert.equal(g.links.length,data.links.length);g.links.forEach((l,i)=>assert.equal(l.value,data.links[i].value));
@@ -30,8 +29,11 @@ const oldSeed=createConfig('branching',1234);oldSeed.version=2;oldSeed.data=merg
 const bad=createConfig('continuous');bad.options.strokeWidth=3;assert.throws(()=>parseConfig(bad),/strokeWidth/);const cycle=createConfig('branching');cycle.data={nodes:[{id:'a',label:'A'},{id:'b',label:'B'}],links:[{source:'a',target:'b',value:1},{source:'b',target:'a',value:1}]};assert.throws(()=>parseConfig(cycle),/acyclic/);
 const legacy=createConfig('branching');legacy.version=1;legacy.options={...legacy.options,strokeWidth:1.2,nodeWidth:12,texture:'stipple',fillTint:.08,patternOpacity:.42};
 const migrated=parseConfig(legacy);assert.equal(migrated.version,3);assert.equal(migrated.options.strokeWidth,.75);assert.equal(migrated.options.nodeWidth,6);assert.equal(migrated.options.texture,'sparse');assert(!('fillTint' in migrated.options));assert(!('patternOpacity' in migrated.options));
+const previous=createConfig('continuous');delete previous.options.edgeFade;delete previous.options.borderRadius;assert.equal(parseConfig(previous).options.edgeFade,0);assert.equal(parseConfig(previous).options.borderRadius,0);
+const invalidFade=createConfig('continuous');invalidFade.options.edgeFade=.5;assert.throws(()=>parseConfig(invalidFade),/edgeFade/);
+const invalidRadius=createConfig('vertical');invalidRadius.options.borderRadius=21;assert.throws(()=>parseConfig(invalidRadius),/borderRadius/);
 const {screenDefs,screenTypes,screenOrder,stippleField,INK,PAPER}=await import('./dist/lab/screens.js');
-class Element{constructor(tag){this.tag=tag;this.attrs={};this.children=[];}setAttribute(key,value){this.attrs[key]=value;}append(...children){this.children.push(...children);}}
+class Element{constructor(tag){this.tag=tag;this.attrs={};this.children=[];}setAttribute(key,value){this.attrs[key]=value;}getAttribute(key){return this.attrs[key]??null;}append(...children){this.children.push(...children);}}
 globalThis.document={createElementNS:(_,tag)=>new Element(tag)};
 const first=screenDefs({seed:1234}),same=screenDefs({seed:1234}),different=screenDefs({seed:1235});assert.deepEqual(first,same);assert.notDeepEqual(first,different);
 const visit=node=>{for(const [name,value]of Object.entries(node.attrs)){if(['fill','stroke'].includes(name))assert([INK,PAPER,'none'].includes(value));assert(!name.includes('opacity'));}assert(!node.tag.includes('Gradient'));node.children.forEach(visit);};visit(first);
@@ -40,5 +42,25 @@ assert(dense.count>80000);assert.equal(dense.count,fine.count);assert.equal(dens
 assert.deepEqual(dense.groups.map(g=>g.d),fine.groups.map(g=>g.d));assert(fine.groups.every((g,i)=>g.radius<dense.groups[i].radius/4));
 const densePattern=first.children.find(p=>p.attrs.id==='riso-dense');assert.equal(densePattern.attrs.width,'900');assert.equal(densePattern.attrs.height,'460');assert.equal(densePattern.children.length,7);
 const fineConfig=createConfig('continuous');fineConfig.options.dotGain=-.8;assert.deepEqual(parseConfig(fineConfig),fineConfig);fineConfig.options.dotGain=-.81;assert.throws(()=>parseConfig(fineConfig),/dotGain/);
+const faded=renderFunnel(createConfig('continuous').data,{...createConfig('continuous').options,variant:'continuous',edgeFade:.35});
+const fadeDefs=faded.children.flatMap(child=>child.children);
+for(const side of ['left','right']){const mask=fadeDefs.find(child=>child.attrs.id===`atlas-fade-${side}`),gradient=fadeDefs.find(child=>child.attrs.id===`atlas-fade-gradient-${side}`);assert(mask);assert.equal(gradient.children.length,edgeFadeStops(.35,side).length);assert.equal(gradient.children[side==='left'?0:gradient.children.length-1].attrs['stop-opacity'],'0');}
+const fadedRibbons=faded.children.filter(child=>child.attrs['data-key']);
+assert.equal(fadedRibbons[0].attrs.mask,'url(#atlas-fade-left)');assert.equal(fadedRibbons.at(-1).attrs.mask,'url(#atlas-fade-right)');
+assert(fadedRibbons.slice(1,-1).every(path=>!path.attrs.mask));
+const singleRibbon=renderFunnel(createConfig('continuous').data.slice(0,2),{variant:'continuous',edgeFade:.35});
+assert.equal(singleRibbon.children.find(child=>child.attrs['data-key']).attrs.mask,'url(#atlas-fade-both)');
+const verticalData=createConfig('vertical').data;
+const square=renderFunnel(verticalData,{variant:'vertical',borderRadius:0});
+const rounded=renderFunnel(verticalData,{variant:'vertical',borderRadius:20});
+const ribbons=svg=>svg.children.filter(child=>child.attrs['data-key']);
+assert(ribbons(rounded).every((path,i)=>path.attrs.d!==ribbons(square)[i].attrs.d&&!path.attrs.d.includes('NaN')));
+const rimSpan=path=>{const commands=path.attrs.d.match(/[MLQ][^MLQZ]*/g),numbers=command=>command.match(/-?\d+(?:\.\d+)?/g).map(Number);return {y:numbers(commands[0])[1],top:numbers(commands[1])[2]-numbers(commands[0])[0],bottom:commands.length>4?numbers(commands[4])[2]-numbers(commands[5])[2]:numbers(commands[2])[0]-numbers(commands[3])[2]};};
+for(const seed of [0,1,1234,4294967295])for(const gap of [0,20])for(const radius of [0,20]){
+ const data=sampleData('vertical',seed),{widths,radii}=verticalRimGeometry(data,{stageHeight:330,stageGap:gap,tailRatio:.45,borderRadius:radius});
+ assert(widths.every((width,i)=>!i||width<=widths[i-1]));
+ const spans=ribbons(renderFunnel(data,{variant:'vertical',stageHeight:330,stageGap:gap,capCurve:0,tailRatio:.45,borderRadius:radius})).map(rimSpan);
+ spans.forEach((span,i)=>{assert(Math.abs(span.top-(widths[i]-2*radii[i]))<1e-8);assert(Math.abs(span.bottom-(widths[i+1]-2*radii[i+1]))<1e-8);if(i){assert(Math.abs(span.y-spans[i-1].y-330/data.length)<1e-8);assert(Math.abs(span.top-spans[i-1].bottom)<1e-8);}});
+}
 for(const type of screenTypes){const order=screenOrder(type);assert.equal(order[0],type);assert.equal(new Set(order).size,6);}
-console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');
+console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, edge fades, vertical rim widths and heights, rounded vertical stages, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');

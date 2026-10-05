@@ -17,9 +17,11 @@ export const defaultConfigs={
       "guides": true,
       "curve": 0.45,
       "chartHeight": 265,
+      "edgeFade": 0,
       "stageHeight": 310,
       "stageGap": 9,
       "capCurve": 12,
+      "borderRadius": 0,
       "tailRatio": 0.65,
       "nodeGap": 66,
       "nodeWidth": 2.5
@@ -125,9 +127,11 @@ export const defaultConfigs={
       "guides": true,
       "curve": 0.45,
       "chartHeight": 235,
+      "edgeFade": 0,
       "stageHeight": 310,
       "stageGap": 9,
       "capCurve": 12,
+      "borderRadius": 0,
       "tailRatio": 0.65,
       "nodeGap": 72,
       "nodeWidth": 1
