@@ -72,9 +72,13 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 .fade-preview{height:14px;margin-top:7px;background:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 5px);pointer-events:none;user-select:none}
 .control--fade input[type=range]{height:40px}
 .fade-hint{display:block;margin-top:7px;font:11px/1.4 ui-monospace,monospace;color:var(--muted)}
-.chart-intro .print-mark{animation:chart-print-in 300ms cubic-bezier(.32,.72,0,1) both;animation-delay:calc(var(--print-step)*70ms)}
-@keyframes chart-print-in{from{opacity:0;transform:translate(var(--print-x),var(--print-y))}to{opacity:1;transform:translate(0,0)}}
-@media(prefers-reduced-motion:reduce){.chart-intro .print-mark{animation:none}}
+.chart-intro--vertical .print-mark{animation:chart-print-in 300ms cubic-bezier(.32,.72,0,1) both;animation-delay:calc(var(--print-step)*70ms)}
+@keyframes chart-print-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.chart-intro--continuous .print-mark{transform-box:fill-box;transform-origin:50% 100%;animation:chart-rise-in 420ms cubic-bezier(.32,.72,0,1) both}
+@keyframes chart-rise-in{from{opacity:.35;transform:scaleY(.55)}to{opacity:1;transform:scaleY(1)}}
+.chart-intro--branching .print-wipe{transform-box:fill-box;transform-origin:left center;animation:chart-branch-in 680ms cubic-bezier(.25,.1,.25,1) both}
+@keyframes chart-branch-in{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media(prefers-reduced-motion:reduce){.chart-intro .print-mark,.chart-intro .print-wipe{animation:none}}
 @media(min-width:741px){
  .workspace>aside{align-self:stretch;min-height:0;padding:0}
  .sidebar-scroll{position:sticky;top:16px;height:min(900px,calc(100dvh - 265px));min-height:320px;padding:24px 22px;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}

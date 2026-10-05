@@ -56,21 +56,25 @@ function attachProximity(svg,sections,axis){
  svg.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'){highlight(pinned);if(pinned)inspect(pinned);}});
 }
 function printEntrance(chart,kind){
- chart.classList.add('chart-intro');
- chart.style.setProperty('--print-x',kind==='vertical'?'0px':'-6px');
- chart.style.setProperty('--print-y',kind==='vertical'?'-6px':'0px');
+ chart.classList.add('chart-intro',`chart-intro--${kind}`);
  const mark=(node,step)=>{node.classList.add('print-mark');node.style.setProperty('--print-step',step);};
  const ribbons=[...chart.querySelectorAll('path[data-key]')];
  if(kind==='branching'){
-  const levels=new Map(chart.atlasLayout.nodes.map(node=>[node.id,node.level]));
-  ribbons.forEach(path=>mark(path,levels.get(path.atlasInfo.source)*2+1));
-  [...chart.querySelectorAll(':scope > rect')].slice(1).forEach((bar,i)=>mark(bar,chart.atlasLayout.nodes[i].level*2));
+  const [, , width,height]=chart.getAttribute('viewBox').split(' ').map(Number),id='lab-figure-print-wipe';
+  const clip=element('clipPath',{id,clipPathUnits:'userSpaceOnUse'});
+  clip.append(element('rect',{x:0,y:0,width,height,class:'print-wipe'}));
+  const defs=element('defs');defs.append(clip);chart.prepend(defs);
+  const bars=[...chart.querySelectorAll(':scope > rect')].slice(1);
+  for(const node of [...ribbons,...bars]){
+   node.setAttribute('clip-path',`url(#${id})`);
+   node.atlasEmphasis?.setAttribute('clip-path',`url(#${id})`);
+  }
+ }else if(kind==='continuous'){
+  ribbons.forEach(path=>mark(path,0));
  }else{
   ribbons.forEach((path,i)=>mark(path,i));
-  if(kind==='vertical'){
-   const steps=new Map(ribbons.map((path,i)=>[path.dataset.key,i]));
-   chart.querySelectorAll('[data-stage-face],[data-stage-outline]').forEach(face=>mark(face,steps.get(face.getAttribute('data-stage-face')||face.getAttribute('data-stage-outline'))));
-  }
+  const steps=new Map(ribbons.map((path,i)=>[path.dataset.key,i]));
+  chart.querySelectorAll('[data-stage-face],[data-stage-outline]').forEach(face=>mark(face,steps.get(face.getAttribute('data-stage-face')||face.getAttribute('data-stage-outline'))));
  }
 }
 function render(intro=false){const config=state[variant];try{const next=renderFunnel(config.data,{...config.options,variant,idPrefix:'lab-figure',seed:config.seed});$('#canvas').replaceChildren(next);svg=next;$('#figure-error').hidden=true;$('#svg-export').disabled=false;$('#save').disabled=false;}catch(e){$('#figure-error').textContent=e.message;$('#figure-error').hidden=false;$('#svg-export').disabled=true;$('#save').disabled=true;return;}pinned=paths().find(p=>p.atlasInfo.key===pinned?.key)?.atlasInfo||null;$('#canvas').dataset.motion='instant';paths().forEach(p=>{
