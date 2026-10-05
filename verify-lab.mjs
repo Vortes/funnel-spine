@@ -1,14 +1,25 @@
 import assert from 'node:assert/strict';
 globalThis.HTMLElement=class {};
-const {variants,createConfig,parseConfig,sampleData}=await import('./dist/lab/config.js');
+const {variants,createConfig,parseConfig,sampleData,setVerticalControl,setVerticalView}=await import('./dist/lab/config.js');
 const {layoutGraph,renderFunnel,edgeFadeStops,verticalRimGeometry,isometricStageGeometry}=await import('./dist/lab/lab-engine.js');
 for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=g.bottom+1e-8);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
 assert.deepEqual(variants,['vertical','continuous','branching']);
 for(const variant of variants)assert.equal(createConfig(variant).options.texture,'mixed');
 const vertical=createConfig('vertical'),isometric=vertical;assert.equal(vertical.options.verticalView,'isometric');assert.equal(vertical.options.stageGap,20);assert.equal(vertical.options.tailRatio,.6);assert.equal(vertical.options.borderRadius,0);assert.equal(vertical.options.edgeFade,0);
 assert.equal(isometric.options.isoDepth,36);assert.equal(isometric.options.isoRotation,30);
+const separateViews=createConfig('vertical');
+setVerticalControl(separateViews.options,'stageHeight',280);setVerticalControl(separateViews.options,'texture','hatch');setVerticalControl(separateViews.options,'paperGrain',true);
+setVerticalView(separateViews.options,'flat');assert.equal(separateViews.options.stageHeight,330);assert.equal(separateViews.options.texture,'mixed');assert.equal(separateViews.options.paperGrain,false);
+setVerticalControl(separateViews.options,'stageGap',4);setVerticalControl(separateViews.options,'borderRadius',12);setVerticalControl(separateViews.options,'tailRatio',1);
+setVerticalView(separateViews.options,'isometric');assert.equal(separateViews.options.stageHeight,280);assert.equal(separateViews.options.texture,'hatch');assert.equal(separateViews.options.stageGap,20);assert.equal(separateViews.options.borderRadius,0);assert.equal(separateViews.options.tailRatio,.6);assert.equal(separateViews.options.paperGrain,true);
+setVerticalView(separateViews.options,'flat');assert.equal(separateViews.options.stageGap,4);assert.equal(separateViews.options.borderRadius,12);assert.equal(separateViews.options.tailRatio,1);
+assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(separateViews))),separateViews);
+const invalidFlatView=structuredClone(separateViews);invalidFlatView.options.verticalViews.isometric.stageGap=21;assert.throws(()=>parseConfig(invalidFlatView),/isometric stageGap/);
+const invalidParkedView=structuredClone(separateViews);invalidParkedView.options.verticalViews.isometric.tailRatio=1;assert.throws(()=>parseConfig(invalidParkedView),/terminal taper/);
+const importedView=structuredClone(vertical);importedView.options.verticalViews.isometric.stageGap=4;assert.equal(parseConfig(importedView).options.stageGap,4);
+const legacyViewSettings=structuredClone(separateViews);delete legacyViewSettings.options.verticalViews;const migratedViews=parseConfig(legacyViewSettings);assert.equal(migratedViews.options.verticalViews.flat.tailRatio,1);assert.equal(migratedViews.options.verticalViews.isometric.tailRatio,.6);assert.equal(migratedViews.options.verticalViews.isometric.stageGap,4);
 const presetRims=verticalRimGeometry(vertical.data,vertical.options);assert.equal(presetRims.radii[0],0);assert(presetRims.widths.every((width,i)=>!i||width<=presetRims.widths[i-1]));
-const oldVertical=structuredClone(vertical);delete oldVertical.options.verticalView;oldVertical.options.stageGap=4;oldVertical.options.borderRadius=4;assert.equal(parseConfig(oldVertical).options.verticalView,'flat');
+const oldVertical=structuredClone(vertical);delete oldVertical.options.verticalView;delete oldVertical.options.verticalViews;oldVertical.options.stageGap=4;oldVertical.options.borderRadius=4;assert.equal(parseConfig(oldVertical).options.verticalView,'flat');
 const oldIsometric=structuredClone(vertical);oldIsometric.variant='isometric';delete oldIsometric.options.verticalView;const migratedIsometric=parseConfig(oldIsometric);assert.equal(migratedIsometric.variant,'vertical');assert.equal(migratedIsometric.options.verticalView,'isometric');
 const invalidView=structuredClone(vertical);invalidView.options.verticalView='sideways';assert.throws(()=>parseConfig(invalidView),/vertical view/);
 const previousVertical=structuredClone(vertical);delete previousVertical.options.borderRadius;assert.equal(parseConfig(previousVertical).options.borderRadius,0);
@@ -81,7 +92,7 @@ for(let i=0;i<projected.length;i++){
  if(i){assert(projected[i-1].bottom<stage.y);assert(stage.y-projected[i-1].bottom<=isometric.options.stageGap+1e-8);}
 }
 const flat=structuredClone(isometric);flat.data[1].value=flat.data[0].value;assert.throws(()=>parseConfig(flat),/decreasing quantities/);
-const untapered=structuredClone(isometric);untapered.options.tailRatio=1;assert.throws(()=>parseConfig(untapered),/terminal taper/);
+const untapered=structuredClone(isometric);setVerticalControl(untapered.options,'tailRatio',1);assert.throws(()=>parseConfig(untapered),/terminal taper/);
 const isoSvg=renderFunnel(isometric.data,{...isometric.options,variant:'vertical'});
 assert.equal(isoSvg.children.filter(child=>child.attrs['data-key']).length,isometric.data.length);
 assert.equal(isoSvg.children.filter(child=>child.attrs['data-stage-face']).length,isometric.data.length*2);
