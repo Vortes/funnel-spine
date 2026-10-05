@@ -13,32 +13,58 @@ function controls(){const holder=$('#controls');holder.replaceChildren();const o
 for(const[name,rows]of [['Ink & screen',shared],['Geometry',shapes[variant]]]){const field=document.createElement('fieldset'),legend=document.createElement('legend');legend.textContent=name;field.append(legend);for(const[key,label,min,max,step,unit]of rows){const div=document.createElement('div');div.className='control';const lbl=document.createElement('label');lbl.className='control-label';lbl.htmlFor=key;lbl.append(document.createTextNode(label));const output=document.createElement('output');output.htmlFor=key;output.textContent=display(options[key],unit);lbl.append(output);const input=document.createElement('input');input.type='range';input.id=key;input.min=min;input.max=max;input.step=step;input.value=options[key];input.addEventListener('input',()=>{options[key]=Number(input.value);output.textContent=display(options[key],unit);render();});div.append(lbl,input);field.append(div);}holder.append(field);}
 for(const[key,label]of (variant==='vertical'?[['labels','Direct annotations'],['paperGrain','Paper grain']]:[['labels','Direct annotations'],['guides','Stage guides'],['paperGrain','Paper grain']])){const l=document.createElement('label');l.className='toggle';l.htmlFor=key;l.textContent=label;const input=document.createElement('input');input.type='checkbox';input.id=key;input.checked=options[key];input.addEventListener('change',()=>{options[key]=input.checked;render();});l.append(input);holder.append(l);}$('#seed').value=state[variant].seed;}
 const paths=()=>svg?[...svg.querySelectorAll('[data-key]')]:[];
-function highlight(info){const keys=new Set();if(info?.kind==='link'&&svg.atlasLayout){const links=svg.atlasLayout.links;const traverse=(id,up,seen=new Set())=>{if(seen.has(id))return;seen.add(id);links.filter(l=>up?l.target===id:l.source===id).forEach(l=>{keys.add(l.id);traverse(up?l.source:l.target,up,seen);});};const link=links.find(l=>l.source===info.source&&l.target===info.target);if(link)keys.add(link.id);traverse(info.source,true);traverse(info.target,false);}paths().forEach(p=>{const active=!info||(info.kind==='link'?keys.has(p.dataset.key):p.atlasInfo.key===info.key);p.setAttribute('fill',active?p.getAttribute('data-base-fill'):PAPER);if(active)p.removeAttribute('stroke-dasharray');else p.setAttribute('stroke-dasharray','2 4');p.setAttribute('aria-pressed',String(pinned?.key===p.atlasInfo.key));p.atlasEmphasis.setAttribute('data-emphasis',String(Boolean(info)&&active));});}
+function highlight(info){svg.atlasClearPull?.();svg.atlasHighlightedKey=info?.key??null;const keys=new Set();if(info?.kind==='link'&&svg.atlasLayout){const links=svg.atlasLayout.links;const traverse=(id,up,seen=new Set())=>{if(seen.has(id))return;seen.add(id);links.filter(l=>up?l.target===id:l.source===id).forEach(l=>{keys.add(l.id);traverse(up?l.source:l.target,up,seen);});};const link=links.find(l=>l.source===info.source&&l.target===info.target);if(link)keys.add(link.id);traverse(info.source,true);traverse(info.target,false);}paths().forEach(p=>{const active=!info||(info.kind==='link'?keys.has(p.dataset.key):p.atlasInfo.key===info.key);p.setAttribute('fill',active?p.getAttribute('data-base-fill'):PAPER);if(active)p.removeAttribute('stroke-dasharray');else p.setAttribute('stroke-dasharray','2 4');p.setAttribute('aria-pressed',String(pinned?.key===p.atlasInfo.key));p.atlasEmphasis.setAttribute('data-emphasis',String(Boolean(info)&&active));});}
 function inspect(info){$('#inspect-state').textContent=pinned?'PINNED PATH':'PATH INSPECTOR';$('#inspect-path').textContent=info?.label||'Explore a ribbon';$('#inspect-value').textContent=info?format(info.value):'—';$('#inspect-conversion').textContent=info?percent(info.value,info.denominator):'—';$('#inspect-total').textContent=info?percent(info.value,info.total):'—';$('#unpin').hidden=!pinned;}
 function select(info){pinned=pinned?.key===info?.key?null:info;highlight(pinned);inspect(pinned||info);}
-function render(){const config=state[variant];try{const next=renderFunnel(config.data,{...config.options,variant,idPrefix:'lab-figure',seed:config.seed});$('#canvas').replaceChildren(next);svg=next;$('#figure-error').hidden=true;$('#svg-export').disabled=false;$('#save').disabled=false;}catch(e){$('#figure-error').textContent=e.message;$('#figure-error').hidden=false;$('#svg-export').disabled=true;$('#save').disabled=true;return;}pinned=paths().find(p=>p.atlasInfo.key===pinned?.key)?.atlasInfo||null;$('#canvas').dataset.motion='instant';
- if(variant==='vertical'){
-  const stages=paths(),height=config.options.stageHeight/config.data.length,{stageGap,capCurve}=config.options;
-  for(let i=0;i<stages.length-1;i++){
-   const width=460*config.data[i+1].value/config.data[0].value;
-   const hit=element('rect',{x:390-width/2,y:70+(i+1)*height-stageGap,width,height:stageGap+capCurve/2,fill:'transparent',class:'stage-gap-hit','aria-hidden':'true'});
-   hit.addEventListener('pointerenter',e=>{if(e.pointerType!=='mouse'||!matchMedia('(hover: hover) and (pointer: fine)').matches)return;$('#canvas').dataset.motion='pointer';if(!pinned){highlight(stages[i].atlasInfo);inspect(stages[i].atlasInfo);}});
-   hit.addEventListener('pointerleave',()=>{highlight(pinned);if(pinned)inspect(pinned);});
-   hit.addEventListener('click',()=>select(stages[i].atlasInfo));
-   svg.insertBefore(hit,stages[0]);
+function attachProximity(svg,sections){
+ const radius=24;
+ const contours=sections.map(path=>{const length=path.getTotalLength(),count=Math.ceil(length/12);return {path,bounds:path.getBBox(),points:Array.from({length:count+1},(_,i)=>path.getPointAtLength(length*i/count))};});
+ let pulled=null;
+ svg.atlasClearPull=()=>{if(!pulled)return;pulled.style.removeProperty('--pull-x');pulled.style.removeProperty('--pull-y');pulled=null;};
+ const show=info=>{if(svg.atlasHighlightedKey===(info?.key??null))return;highlight(info);if(info)inspect(info);};
+ svg.addEventListener('pointermove',e=>{
+  if(e.pointerType!=='mouse'||!matchMedia('(hover: hover) and (pointer: fine)').matches||pinned)return;
+  $('#canvas').dataset.motion='pointer';
+  const section=e.target.closest('path[data-key]');
+  if(section){svg.atlasClearPull();show(section.atlasInfo);return;}
+  const point=svg.createSVGPoint();point.x=e.clientX;point.y=e.clientY;
+  const cursor=point.matrixTransform(svg.getScreenCTM().inverse());
+  let nearest=null;
+  for(const {path,bounds,points} of contours){
+   if(cursor.x<bounds.x-radius||cursor.x>bounds.x+bounds.width+radius||cursor.y<bounds.y-radius||cursor.y>bounds.y+bounds.height+radius)continue;
+   for(let i=1;i<points.length;i++){
+    const a=points[i-1],b=points[i],vx=b.x-a.x,vy=b.y-a.y,length=vx*vx+vy*vy;
+    if(!length)continue;
+    const t=Math.max(0,Math.min(1,((cursor.x-a.x)*vx+(cursor.y-a.y)*vy)/length));
+    const dx=cursor.x-a.x-t*vx,dy=cursor.y-a.y-t*vy,distance=dx*dx+dy*dy;
+    if(!nearest||distance<nearest.distance)nearest={path,dx,dy,distance};
+   }
   }
- }
- paths().forEach(p=>{
+  if(!nearest||nearest.distance>=radius*radius){show(null);return;}
+  show(nearest.path.atlasInfo);
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){svg.atlasClearPull();return;}
+  const distance=Math.sqrt(nearest.distance),pull=Math.min(5,distance*2)*(1-distance/radius);
+  const emphasis=nearest.path.atlasEmphasis;
+  if(pulled&&pulled!==emphasis)svg.atlasClearPull();
+  if(!distance)return;
+  emphasis.style.setProperty('--pull-x',`${nearest.dx/distance*pull}px`);
+  emphasis.style.setProperty('--pull-y',`${nearest.dy/distance*pull}px`);
+  pulled=emphasis;
+ });
+ svg.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse'){highlight(pinned);if(pinned)inspect(pinned);}});
+}
+function render(){const config=state[variant];try{const next=renderFunnel(config.data,{...config.options,variant,idPrefix:'lab-figure',seed:config.seed});$('#canvas').replaceChildren(next);svg=next;$('#figure-error').hidden=true;$('#svg-export').disabled=false;$('#save').disabled=false;}catch(e){$('#figure-error').textContent=e.message;$('#figure-error').hidden=false;$('#svg-export').disabled=true;$('#save').disabled=true;return;}pinned=paths().find(p=>p.atlasInfo.key===pinned?.key)?.atlasInfo||null;$('#canvas').dataset.motion='instant';paths().forEach(p=>{
  const emphasis=element('path',{d:p.getAttribute('d'),fill:'none',stroke:INK,'stroke-width':1,'vector-effect':'non-scaling-stroke',opacity:0,class:'section-emphasis','aria-hidden':'true','pointer-events':'none','data-emphasis':'false'});p.atlasEmphasis=emphasis;svg.append(emphasis);
  const preview=()=>{if(!pinned){highlight(p.atlasInfo);inspect(p.atlasInfo);}};
  p.addEventListener('pointerenter',e=>{if(e.pointerType!=='mouse'||!matchMedia('(hover: hover) and (pointer: fine)').matches)return;$('#canvas').dataset.motion='pointer';preview();});
  p.addEventListener('focus',()=>{$('#canvas').dataset.motion='instant';preview();});
- p.addEventListener('pointerleave',()=>{highlight(pinned);if(pinned)inspect(pinned);});
  p.addEventListener('blur',()=>{$('#canvas').dataset.motion='instant';highlight(pinned);});
  p.addEventListener('pointerdown',e=>{$('#canvas').dataset.motion=e.pointerType==='mouse'?'pointer':'instant';});
  p.addEventListener('click',()=>select(p.atlasInfo));
  p.addEventListener('keydown',e=>{$('#canvas').dataset.motion='instant';if(e.key==='Enter'||e.key===' '){e.preventDefault();select(p.atlasInfo);}if(e.key==='Escape'){pinned=null;highlight(null);inspect(p.atlasInfo);}});
- });highlight(pinned);inspect(pinned||paths()[0]?.atlasInfo);$('.figure-subtitle').textContent=variant==='branching'?'One entry bucket. Every split distributes 100% to its children.':'A study of quantity, progression, and loss.';$('#figure-title').textContent=titles[variant];$('#figure-number').textContent=`FIG. 00${variants.indexOf(variant)+1}`;$('#figure-caption').textContent=captions[variant];document.querySelectorAll('[data-variant]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.variant===variant)));$('#config-code').textContent=JSON.stringify(config,null,2);$('#compare-view p').textContent=variant==='branching'?'Conversion uses the parent bucket quantity. Every split accounts for 100%, including drop-off.':'Conversion uses the preceding stage quantity. Of total uses the entry quantity.';comparison();legend();}
+ });
+ attachProximity(svg,paths());
+ highlight(pinned);inspect(pinned||paths()[0]?.atlasInfo);$('.figure-subtitle').textContent=variant==='branching'?'One entry bucket. Every split distributes 100% to its children.':'A study of quantity, progression, and loss.';$('#figure-title').textContent=titles[variant];$('#figure-number').textContent=`FIG. 00${variants.indexOf(variant)+1}`;$('#figure-caption').textContent=captions[variant];document.querySelectorAll('[data-variant]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.variant===variant)));$('#config-code').textContent=JSON.stringify(config,null,2);$('#compare-view p').textContent=variant==='branching'?'Conversion uses the parent bucket quantity. Every split accounts for 100%, including drop-off.':'Conversion uses the preceding stage quantity. Of total uses the entry quantity.';comparison();legend();}
 
 function legend(){const holder=$('#screen-legend');holder.replaceChildren();const names=['sparse','dense','am','hatch','cross','coarse','solid'];for(const type of names){const item=document.createElement('div');item.className='legend-item';item.append(screenSwatch(type,{...state[variant].options,seed:state[variant].seed},`legend-${type}`));const label=document.createElement('span');label.textContent=screenLabels[type];const caption=document.createElement('small');caption.textContent=type==='am'?'30% SCREEN':type==='cross'||type==='hatch'?'50% SCREEN':type==='coarse'?'70% SCREEN':type==='solid'?'SMALL MARKS ONLY':'STOCHASTIC';label.append(caption);item.append(label);holder.append(item);}}
 
