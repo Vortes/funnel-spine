@@ -71,6 +71,7 @@ assert.equal(isoSvg.children.filter(child=>child.attrs['data-key']).length,isome
 assert.equal(isoSvg.children.filter(child=>child.attrs['data-stage-face']).length,isometric.data.length*2);
 const isoPatternIds=new Set(isoSvg.children.filter(child=>child.tag==='defs').flatMap(defs=>defs.children.map(child=>child.attrs.id)));
 assert(isoSvg.children.filter(child=>child.attrs['data-stage-face']).every(face=>isoPatternIds.has(face.attrs.fill.match(/^url\(#(.+)\)$/)?.[1])));
+assert(isoSvg.children.filter(child=>child.attrs['data-face']==='top').every(face=>face.attrs.fill==='url(#atlas-sparse)'));
 for(const rotation of [-30,30]){
  const options={...isometric.options,isoRotation:rotation,borderRadius:16},geometry=isometricStageGeometry(isometric.data,options),roundedIso=renderFunnel(isometric.data,{...options,variant:'isometric'});
  assert(geometry.every(stage=>stage.outline.includes('Q')&&!stage.outline.includes('NaN')));

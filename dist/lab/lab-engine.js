@@ -86,7 +86,7 @@ export function renderFunnel(data,{variant='continuous',texture='dense',density=
  const svg=make('svg',{xmlns:NS,viewBox:`0 0 ${width} ${height}`,width:'100%',role:'group','aria-label':`${variant} conversion funnel`});
  if(width>900)svg.style.minWidth=`${width}px`;
  color=INK;strokeWidth*=4/3;
- svg.append(screenDefs({idPrefix,density,patternAngle,dotGain,roughness,seed,screenWidth:width,screenHeight:height,stippleScale}));
+ svg.append(screenDefs({idPrefix,density,patternAngle,dotGain,roughness,seed,screenWidth:width,screenHeight:height,stippleScale,includeSparse:variant==='isometric'}));
  if(variant==='continuous'&&edgeFade>0){const defs=make('defs');for(const side of ['left','right','both']){const gradient=make('linearGradient',{id:`${idPrefix}-fade-gradient-${side}`,x1:'0%',y1:'0%',x2:'100%',y2:'0%'});for(const[offset,alpha]of edgeFadeStops(edgeFade,side))gradient.append(make('stop',{offset:`${offset*100}%`,'stop-color':'white','stop-opacity':alpha}));const mask=make('mask',{id:`${idPrefix}-fade-${side}`,maskUnits:'objectBoundingBox',maskContentUnits:'objectBoundingBox',x:0,y:0,width:1,height:1,'mask-type':'alpha'});mask.append(make('rect',{x:0,y:0,width:1,height:1,fill:`url(#${idPrefix}-fade-gradient-${side})`}));defs.append(gradient,mask);}svg.append(defs);}
  svg.append(make('rect',{width,height,fill:paperGrain?`url(#${idPrefix}-grain)`:PAPER}));
  const fillTypes=[];
@@ -104,7 +104,7 @@ export function renderFunnel(data,{variant='continuous',texture='dense',density=
   }else if(variant==='isometric'){
    const stages=isometricStageGeometry(data,{stageHeight,stageGap,tailRatio,isoDepth,isoRotation,borderRadius});
    if(borderRadius){const clips=make('defs');stages.forEach((stage,i)=>{const clip=make('clipPath',{id:`${idPrefix}-stage-clip-${i}`,clipPathUnits:'userSpaceOnUse'});clip.append(make('path',{d:stage.outline}));clips.append(clip);});svg.append(clips);}
-   for(const [i,stage] of stages.entries()){const clip=borderRadius?{'clip-path':`url(#${idPrefix}-stage-clip-${i})`}:{};for(const [face,d,type] of [['side',stage.side,'cross'],['top',stage.top,'am']]){const path=make('path',{d,fill:`url(#${idPrefix}-${type})`,stroke:color,'stroke-width':strokeWidth,'pointer-events':'none','data-stage-face':stage.key,'data-face':face,'data-base-fill':`url(#${idPrefix}-${type})`,...clip});svg.append(path);}}
+   for(const [i,stage] of stages.entries()){const clip=borderRadius?{'clip-path':`url(#${idPrefix}-stage-clip-${i})`}:{};for(const [face,d,type] of [['side',stage.side,'cross'],['top',stage.top,'sparse']]){const path=make('path',{d,fill:`url(#${idPrefix}-${type})`,stroke:color,'stroke-width':strokeWidth,'pointer-events':'none','data-stage-face':stage.key,'data-face':face,'data-base-fill':`url(#${idPrefix}-${type})`,...clip});svg.append(path);}}
    stages.forEach((stage,i)=>{const s=data[i],clip=borderRadius?{'clip-path':`url(#${idPrefix}-stage-clip-${i})`}:{};interactive(make('path',{d:stage.front,fill:chooseScreen(i),stroke:color,'stroke-width':strokeWidth,...clip}),s.id,{label:s.label,value:s.value,denominator:data[i-1]?.value??max,total:max,kind:'stage'});});
    if(labels)stages.forEach((stage,i)=>{const s=data[i],mid=(stage.y+stage.bottom)/2;svg.append(text(52,mid,`${String(i+1).padStart(2,'0')}`,12));svg.append(make('line',{x1:stage.outerRight+12,y1:mid,x2:655,y2:mid,stroke:color,'stroke-width':.5,'stroke-dasharray':'2 3'}));svg.append(text(670,mid-4,s.label,fontSize));svg.append(text(670,mid+15,`${fmt(s.value)} · ${pct(s.value,max)}`,fontSize-2));});
   }else{
