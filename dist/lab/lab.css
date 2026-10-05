@@ -75,6 +75,7 @@ pre{font-size:12px}legend{font-weight:400;letter-spacing:.1em}
 .chart-intro--vertical .print-mark{animation:chart-print-in 300ms cubic-bezier(.32,.72,0,1) both;animation-delay:calc(var(--print-step)*70ms)}
 @keyframes chart-print-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .chart-intro--continuous .print-mark{transform-box:fill-box;transform-origin:50% 100%;animation:chart-rise-in 250ms cubic-bezier(.32,.72,0,1) both;animation-delay:calc(var(--print-step)*250ms)}
+.chart-intro--mirrored .print-mark{transform-origin:50% 50%}
 @keyframes chart-rise-in{from{opacity:0;transform:scaleY(.55)}to{opacity:1;transform:scaleY(1)}}
 .chart-intro--branching .print-wipe{transform-box:fill-box;transform-origin:left center;animation:chart-branch-in 680ms cubic-bezier(.25,.1,.25,1) both}
 @keyframes chart-branch-in{from{transform:scaleX(0)}to{transform:scaleX(1)}}

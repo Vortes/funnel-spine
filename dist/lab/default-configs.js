@@ -18,6 +18,7 @@ export const defaultConfigs={
       "curve": 0.45,
       "chartHeight": 265,
       "edgeFade": 0,
+      "mirror": false,
       "stageHeight": 310,
       "stageGap": 9,
       "capCurve": 12,

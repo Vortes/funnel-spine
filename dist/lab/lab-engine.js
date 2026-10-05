@@ -78,9 +78,10 @@ export function isometricStageGeometry(data,{stageHeight=310,stageGap=20,tailRat
   };
  });
 }
-export function renderFunnel(data,{variant='continuous',texture='mixed',density=7,strokeWidth=.5,color=INK,labels=true,curve=.5,idPrefix='atlas',chartHeight=235,edgeFade=0,stageHeight=310,stageGap=9,capCurve=12,borderRadius=0,tailRatio=.65,verticalView='isometric',isoDepth=36,isoRotation=30,nodeGap=66,nodeWidth=2.5,patternAngle=-45,dotGain=.03,roughness=.15,paperGrain=false,seed=1234,fontSize=14,guides=true,stippleScale=2}={}) {
+export function renderFunnel(data,{variant='continuous',texture='mixed',density=7,strokeWidth=.5,color=INK,labels=true,curve=.5,idPrefix='atlas',chartHeight=235,edgeFade=0,mirror=false,stageHeight=310,stageGap=9,capCurve=12,borderRadius=0,tailRatio=.65,verticalView='isometric',isoDepth=36,isoRotation=30,nodeGap=66,nodeWidth=2.5,patternAngle=-45,dotGain=.03,roughness=.15,paperGrain=false,seed=1234,fontSize=14,guides=true,stippleScale=2}={}) {
  if(!['continuous','vertical','branching'].includes(variant))throw new Error('Unknown funnel variant.');validateData(data,variant);
  if(variant==='vertical'&&!['flat','isometric'].includes(verticalView))throw new Error('Choose a flat or isometric vertical view.');
+ if(variant==='continuous'&&typeof mirror!=='boolean')throw new Error('mirror must be true or false.');
  if(texture!=='mixed'&&!screenTypes.includes(texture))throw new Error('Choose a supported screen pattern.');
  const isometric=variant==='vertical'&&verticalView==='isometric';
  const graph=variant==='branching'?layoutGraph(data,{nodeGap,nodeWidth}):null;
@@ -102,7 +103,25 @@ export function renderFunnel(data,{variant='continuous',texture='mixed',density=
  }else{
   const max=data[0].value||1;
   if(variant==='continuous'){
-   const step=790/(data.length-1);const base=365;if(guides){for(const ratio of [0,.25,.5,.75,1]){const y=base-chartHeight*ratio;svg.append(make('line',{x1:38,y1:y,x2:46,y2:y,stroke:color,'stroke-width':.4}),text(31,y+3,`${Math.round(ratio*100)}`,10,{'text-anchor':'end'}));}svg.append(text(31,base-chartHeight-13,'%',10,{'text-anchor':'end'}));}data.forEach((s,i)=>{const x=50+i*step,h=s.value/max*chartHeight;svg.append(make('line',{x1:x,y1:96,x2:x,y2:386,stroke:color,'stroke-dasharray':'2 5'}));if(labels){svg.append(text(x,59,s.label,fontSize,{'text-anchor':i===data.length-1?'end':'start'}));svg.append(text(x,81,fmt(s.value),fontSize-2,{'text-anchor':i===data.length-1?'end':'start'}));}if(i<data.length-1){const next=data[i+1],h2=next.value/max*chartHeight;const xx=x+step,c=step*curve;const d=`M ${x} ${base-h} C ${x+c} ${base-h} ${xx-c} ${base-h2} ${xx} ${base-h2} L ${xx} ${base} L ${x} ${base} Z`;const fadeSide=i===0&&i===data.length-2?'both':i===0?'left':i===data.length-2?'right':null;interactive(make('path',{d,fill:chooseScreen(i),stroke:color,'stroke-width':strokeWidth,...(edgeFade>0&&fadeSide?{mask:`url(#${idPrefix}-fade-${fadeSide})`}:{})}),s.id,{label:`${s.label} → ${next.label}`,value:next.value,denominator:s.value,total:max,kind:'stage'});}svg.append(text(x,417,`${String(i+1).padStart(2,'0')} / ${pct(s.value,max)}`,12,{'text-anchor':i===data.length-1?'end':'start'}));});if(!edgeFade)svg.append(make('line',{x1:50,y1:365,x2:840,y2:365,stroke:color,'stroke-width':strokeWidth}));
+   const step=790/(data.length-1),base=365,center=base-chartHeight/2;
+   if(guides){
+    const marks=mirror?[1,.75,.5,.25,0,.25,.5,.75,1].map((ratio,i)=>[center+(i-4)*chartHeight/8,ratio]):[0,.25,.5,.75,1].map(ratio=>[base-chartHeight*ratio,ratio]);
+    for(const [y,ratio]of marks)svg.append(make('line',{x1:38,y1:y,x2:46,y2:y,stroke:color,'stroke-width':.4}),text(31,y+3,`${Math.round(ratio*100)}`,10,{'text-anchor':'end'}));
+    svg.append(text(31,base-chartHeight-13,'%',10,{'text-anchor':'end'}));
+   }
+   data.forEach((s,i)=>{
+    const x=50+i*step,h=s.value/max*chartHeight,top=mirror?center-h/2:base-h,bottom=mirror?center+h/2:base;
+    svg.append(make('line',{x1:x,y1:96,x2:x,y2:386,stroke:color,'stroke-dasharray':'2 5'}));
+    if(labels){svg.append(text(x,59,s.label,fontSize,{'text-anchor':i===data.length-1?'end':'start'}));svg.append(text(x,81,fmt(s.value),fontSize-2,{'text-anchor':i===data.length-1?'end':'start'}));}
+    if(i<data.length-1){
+     const next=data[i+1],h2=next.value/max*chartHeight,top2=mirror?center-h2/2:base-h2,bottom2=mirror?center+h2/2:base,xx=x+step,c=step*curve;
+     const d=mirror?`M ${x} ${top} C ${x+c} ${top} ${xx-c} ${top2} ${xx} ${top2} L ${xx} ${bottom2} C ${xx-c} ${bottom2} ${x+c} ${bottom} ${x} ${bottom} Z`:`M ${x} ${top} C ${x+c} ${top} ${xx-c} ${top2} ${xx} ${top2} L ${xx} ${base} L ${x} ${base} Z`;
+     const fadeSide=i===0&&i===data.length-2?'both':i===0?'left':i===data.length-2?'right':null;
+     interactive(make('path',{d,fill:chooseScreen(i),stroke:color,'stroke-width':strokeWidth,...(edgeFade>0&&fadeSide?{mask:`url(#${idPrefix}-fade-${fadeSide})`}:{})}),s.id,{label:`${s.label} → ${next.label}`,value:next.value,denominator:s.value,total:max,kind:'stage'});
+    }
+    svg.append(text(x,417,`${String(i+1).padStart(2,'0')} / ${pct(s.value,max)}`,12,{'text-anchor':i===data.length-1?'end':'start'}));
+   });
+   if(!mirror&&!edgeFade)svg.append(make('line',{x1:50,y1:365,x2:840,y2:365,stroke:color,'stroke-width':strokeWidth}));
   }else if(isometric){
    const stages=isometricStageGeometry(data,{stageHeight,stageGap,tailRatio,isoDepth,isoRotation,borderRadius});
    if(borderRadius){const clips=make('defs');stages.forEach((stage,i)=>{const clip=make('clipPath',{id:`${idPrefix}-stage-clip-${i}`,clipPathUnits:'userSpaceOnUse'});clip.append(make('path',{d:stage.outline}));clips.append(clip);});svg.append(clips);}

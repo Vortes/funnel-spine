@@ -3,7 +3,7 @@ globalThis.HTMLElement=class {};
 const {variants,createConfig,parseConfig,sampleData}=await import('./dist/lab/config.js');
 const {layoutGraph,renderFunnel,edgeFadeStops,verticalRimGeometry,isometricStageGeometry}=await import('./dist/lab/lab-engine.js');
 for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=g.bottom+1e-8);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
-assert.deepEqual(variants,['continuous','vertical','branching']);
+assert.deepEqual(variants,['vertical','continuous','branching']);
 for(const variant of variants)assert.equal(createConfig(variant).options.texture,'mixed');
 const vertical=createConfig('vertical'),isometric=vertical;assert.equal(vertical.options.verticalView,'isometric');assert.equal(vertical.options.stageGap,20);assert.equal(vertical.options.tailRatio,.6);assert.equal(vertical.options.borderRadius,0);assert.equal(vertical.options.edgeFade,0);
 assert.equal(isometric.options.isoDepth,36);assert.equal(isometric.options.isoRotation,30);
@@ -37,6 +37,10 @@ const legacy=createConfig('branching');legacy.version=1;legacy.options={...legac
 const migrated=parseConfig(legacy);assert.equal(migrated.version,3);assert.equal(migrated.options.strokeWidth,.75);assert.equal(migrated.options.nodeWidth,6);assert.equal(migrated.options.texture,'dense');assert(!('fillTint' in migrated.options));assert(!('patternOpacity' in migrated.options));
 const previous=createConfig('continuous');delete previous.options.edgeFade;delete previous.options.borderRadius;assert.equal(parseConfig(previous).options.edgeFade,0);assert.equal(parseConfig(previous).options.borderRadius,0);
 const invalidFade=createConfig('continuous');invalidFade.options.edgeFade=.5;assert.throws(()=>parseConfig(invalidFade),/edgeFade/);
+const continuous=createConfig('continuous');assert.equal(continuous.options.mirror,false);
+const mirroredConfig=structuredClone(continuous);mirroredConfig.options.mirror=true;assert.equal(parseConfig(mirroredConfig).options.mirror,true);
+const oldContinuous=structuredClone(continuous);delete oldContinuous.options.mirror;assert.equal(parseConfig(oldContinuous).options.mirror,false);
+const invalidMirror=structuredClone(continuous);invalidMirror.options.mirror='true';assert.throws(()=>parseConfig(invalidMirror),/mirror/);
 const invalidRadius=createConfig('vertical');invalidRadius.options.borderRadius=21;assert.throws(()=>parseConfig(invalidRadius),/borderRadius/);
 const {screenDefs,screenTypes,screenSwatch,stippleField,INK,PAPER}=await import('./dist/lab/screens.js');
 class Element{constructor(tag){this.tag=tag;this.attrs={};this.children=[];}setAttribute(key,value){this.attrs[key]=value;}getAttribute(key){return this.attrs[key]??null;}append(...children){this.children.push(...children);}}
@@ -48,6 +52,13 @@ assert(dense.count>80000);assert.equal(dense.count,fine.count);assert.equal(dens
 assert.deepEqual(dense.groups.map(g=>g.d),fine.groups.map(g=>g.d));assert(fine.groups.every((g,i)=>g.radius<dense.groups[i].radius/4));
 const densePattern=first.children.find(p=>p.attrs.id==='riso-dense');assert.equal(densePattern.attrs.width,'900');assert.equal(densePattern.attrs.height,'460');assert.equal(densePattern.children.length,7);
 const fineConfig=createConfig('continuous');fineConfig.options.dotGain=-.8;assert.deepEqual(parseConfig(fineConfig),fineConfig);fineConfig.options.dotGain=-.81;assert.throws(()=>parseConfig(fineConfig),/dotGain/);
+const mirroredSvg=renderFunnel(continuous.data,{...mirroredConfig.options,variant:'continuous'});
+mirroredSvg.children.filter(child=>child.attrs['data-key']).forEach((path,i)=>{
+ const d=path.attrs.d,numbers=d.match(/-?\d+(?:\.\d+)?/g).map(Number),top=numbers[1],bottom=numbers.at(-1);
+ assert.equal((d.match(/ C /g)||[]).length,2);
+ assert(Math.abs((top+bottom)/2-(365-continuous.options.chartHeight/2))<1e-8);
+ assert(Math.abs(bottom-top-continuous.data[i].value/continuous.data[0].value*continuous.options.chartHeight)<1e-8);
+});
 const faded=renderFunnel(createConfig('continuous').data,{...createConfig('continuous').options,variant:'continuous',edgeFade:.35});
 const fadeDefs=faded.children.flatMap(child=>child.children);
 for(const side of ['left','right']){const mask=fadeDefs.find(child=>child.attrs.id===`atlas-fade-${side}`),gradient=fadeDefs.find(child=>child.attrs.id===`atlas-fade-gradient-${side}`);assert(mask);assert.equal(gradient.children.length,edgeFadeStops(.35,side).length);assert.equal(gradient.children[side==='left'?0:gradient.children.length-1].attrs['stop-opacity'],'0');}
@@ -115,4 +126,4 @@ for(const variant of variants){const config=createConfig(variant);config.options
 const mixSwatch=screenSwatch('mixed');assert.equal(mixSwatch.children.filter(child=>child.tag==='rect').length,screenTypes.length+1);
 for(const texture of ['sparse','stipple','solid']){const old=createConfig('continuous');old.options.texture=texture;assert.equal(parseConfig(old).options.texture,'dense');}
 assert.deepEqual(screenTypes,['dense','am','hatch','cross','coarse']);
-console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, edge fades, vertical rim widths and heights, rounded vertical and rotated isometric stages, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');
+console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, edge fades, mirrored continuous geometry, vertical rim widths and heights, rounded vertical and rotated isometric stages, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');
