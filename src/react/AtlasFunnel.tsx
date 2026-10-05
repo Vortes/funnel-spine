@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, memo, useId, useMemo, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode } from 'react';
+import { forwardRef, memo, useId, useMemo, useState, type HTMLAttributes, type ReactNode } from 'react';
 import { normalizeOptions } from '../../dist/lab/options.js';
 import { buildChartModel, type ChartMark, type ChartModel, type FunnelGraph, type FunnelVariant, type Inspection, type Stage } from '../chart/model';
 import { ScreenDefs } from './ScreenDefs';
@@ -40,12 +40,9 @@ export type VerticalViewSettings = Partial<Pick<FunnelOptions,
   'paperGrain' | 'fontSize' | 'labels' | 'stageHeight' | 'stageGap' | 'capCurve' |
   'borderRadius' | 'tailRatio' | 'isoDepth' | 'isoRotation'>>;
 
-type SharedProps = Omit<HTMLAttributes<HTMLDivElement>, 'onSelect'> & {
+type SharedProps = HTMLAttributes<HTMLDivElement> & {
   options?: FunnelOptions;
   seed?: number;
-  selectedKey?: string | null;
-  defaultSelectedKey?: string | null;
-  onSelectionChange?: (key: string | null, inspection: Inspection | null) => void;
   onInspect?: (inspection: Inspection | null) => void;
   idPrefix?: string;
   viewBox?: string;
@@ -84,17 +81,14 @@ function connectedLinks(model: ChartModel, key: string): Set<string> {
   return linked;
 }
 
-function Mark({ mark, idPrefix, activeKey, visibleKeys, selectedKey, roughness, onPreview, onLeave, onChoose, onClear }: {
+function Mark({ mark, idPrefix, activeKey, visibleKeys, roughness, onPreview, onLeave }: {
   mark: ChartMark;
   idPrefix: string;
   activeKey: string | null;
   visibleKeys: Set<string> | null;
-  selectedKey: string | null;
   roughness: number;
   onPreview: (info: Inspection) => void;
   onLeave: () => void;
-  onChoose: (info: Inspection) => void;
-  onClear: () => void;
 }) {
   if (mark.type === 'line') return <line x1={mark.x1} y1={mark.y1} x2={mark.x2} y2={mark.y2} stroke={INK}
     strokeWidth={mark.strokeWidth} strokeDasharray={mark.dash} data-ink-baseline={mark.baseline ? '' : undefined} />;
@@ -111,38 +105,22 @@ function Mark({ mark, idPrefix, activeKey, visibleKeys, selectedKey, roughness, 
   const clipPath = mark.clipId ? `url(#${idPrefix}-${mark.clipId})` : undefined;
   const mask = mark.maskSide ? `url(#${idPrefix}-fade-${mark.maskSide})` : undefined;
   const stroke = mark.stroke === false ? undefined : INK;
-  const onKeyDown = (event: KeyboardEvent<SVGPathElement>) => {
-    if (!inspection) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      onChoose(inspection);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      onClear();
-    }
-  };
   return <>
     <path d={mark.d} fill={fill} stroke={stroke} strokeWidth={mark.strokeWidth} strokeLinejoin={mark.lineJoin}
       strokeDasharray={inspection && !visible ? '2 4' : undefined} clipPath={clipPath} mask={mask}
       filter={inspection && roughness > 0 ? `url(#${idPrefix}-edge)` : undefined} data-base-fill={baseFill}
       data-key={inspection?.key} data-stage-face={mark.face ? mark.stageId : undefined}
       data-face={mark.face} data-stage-outline={mark.outline ? mark.stageId : undefined}
-      role={inspection ? 'button' : undefined} tabIndex={inspection ? 0 : undefined}
+      role={inspection ? 'img' : undefined} tabIndex={inspection ? 0 : undefined}
       aria-label={inspection ? `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` : undefined}
-      aria-pressed={inspection ? selectedKey === inspection.key : undefined}
       pointerEvents={mark.face || mark.outline ? 'none' : undefined}
-      style={inspection ? { cursor: 'pointer' } : undefined}
+      onPointerDown={inspection ? event => event.preventDefault() : undefined}
       onPointerEnter={inspection ? event => { if (event.pointerType === 'mouse') onPreview(inspection); } : undefined}
       onPointerLeave={inspection ? onLeave : undefined}
       onFocus={inspection ? () => onPreview(inspection) : undefined}
-      onBlur={inspection ? onLeave : undefined}
-      onClick={inspection ? () => onChoose(inspection) : undefined}
-      onKeyDown={inspection ? onKeyDown : undefined}>
+      onBlur={inspection ? onLeave : undefined}>
       {inspection && <title>{`${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion`}</title>}
     </path>
-    {inspection && <path d={mark.d} fill="none" stroke={INK} strokeWidth={1} vectorEffect="non-scaling-stroke"
-      opacity={0} className="section-emphasis" aria-hidden="true" pointerEvents="none" data-emphasis={String(Boolean(activeKey) && visible)}
-      data-emphasis-key={inspection.key} clipPath={clipPath} mask={mask} />}
   </>;
 }
 
@@ -162,8 +140,8 @@ function FadeDefs({ model, idPrefix }: { model: ChartModel; idPrefix: string }) 
 }
 
 export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function AtlasFunnel({
-  data, variant = 'continuous', options = emptyOptions, seed = 1234, selectedKey, defaultSelectedKey = null,
-  onSelectionChange, onInspect, idPrefix: suppliedPrefix, viewBox, children, style, ...rootProps
+  data, variant = 'continuous', options = emptyOptions, seed = 1234,
+  onInspect, idPrefix: suppliedPrefix, viewBox, children, style, ...rootProps
 }, ref) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new Error('Seed must be an integer between 0 and 4294967295.');
   const id = useId();
@@ -175,34 +153,16 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
   if (variant === 'vertical' && normalized.verticalViews) {
     buildChartModel(data, 'vertical', { ...normalized, ...normalized.verticalViews.isometric, verticalView: 'isometric' });
   }
-  const [internalKey, setInternalKey] = useState(defaultSelectedKey);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
-  const controlled = selectedKey !== undefined;
-  const requestedKey = controlled ? selectedKey : internalKey;
   const inspections = useMemo(() => new Map(model.marks.flatMap(mark => mark.type === 'path' && mark.inspection ? [[mark.inspection.key, mark.inspection] as const] : [])), [model]);
-  const chosenKey = requestedKey && inspections.has(requestedKey) ? requestedKey : null;
-  const activeKey = chosenKey ?? (hoverKey && inspections.has(hoverKey) ? hoverKey : null);
+  const activeKey = hoverKey && inspections.has(hoverKey) ? hoverKey : null;
   const visibleKeys = useMemo(() => activeKey && model.variant === 'branching' ? connectedLinks(model, activeKey) : null, [model, activeKey]);
   const preview = (info: Inspection) => {
-    if (chosenKey) return;
     setHoverKey(info.key);
     onInspect?.(info);
   };
   const leave = () => {
     setHoverKey(null);
-    onInspect?.(chosenKey ? inspections.get(chosenKey)! : null);
-  };
-  const choose = (info: Inspection) => {
-    const next = chosenKey === info.key ? null : info.key;
-    if (!controlled) setInternalKey(next);
-    setHoverKey(null);
-    onSelectionChange?.(next, next ? info : null);
-  };
-  const clear = () => {
-    if (!chosenKey) return;
-    if (!controlled) setInternalKey(null);
-    setHoverKey(null);
-    onSelectionChange?.(null, null);
     onInspect?.(null);
   };
   return <div {...rootProps} ref={ref} style={{ display: 'block', ...style }}>
@@ -214,8 +174,8 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
       <FadeDefs model={model} idPrefix={idPrefix} />
       <rect width={model.width} height={model.height} fill={normalized.paperGrain ? `url(#${idPrefix}-grain)` : PAPER} />
       {model.marks.map(mark => <Mark key={mark.key} mark={mark} idPrefix={idPrefix}
-        activeKey={activeKey} visibleKeys={visibleKeys} selectedKey={chosenKey} roughness={normalized.roughness ?? .15}
-        onPreview={preview} onLeave={leave} onChoose={choose} onClear={clear} />)}
+        activeKey={activeKey} visibleKeys={visibleKeys} roughness={normalized.roughness ?? .15}
+        onPreview={preview} onLeave={leave} />)}
       {children}
     </svg>
   </div>;

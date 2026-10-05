@@ -41,7 +41,6 @@ dom.window.HTMLCanvasElement.prototype.getContext = () => null;
 
 const { createRoot } = await import('react-dom/client');
 const root = createRoot(document.querySelector('#app'));
-const selected = [];
 const inspected = [];
 const options = { roughness: 0 };
 let chartRef;
@@ -50,7 +49,6 @@ const chartProps = {
   data: stages,
   className: 'user-chart',
   'data-testid': 'funnel',
-  onSelectionChange: (key, info) => selected.push([key, info?.value ?? null]),
   onInspect: info => inspected.push(info?.key ?? null),
 };
 await act(async () => {
@@ -63,15 +61,15 @@ await act(async () => root.render(createElement(AtlasFunnel, { ...chartProps, op
 assert.equal(chartRef.querySelector('svg'), firstSvg);
 const path = chartRef.querySelector('[data-key="entry"]');
 assert(path);
-assert.equal(path.getAttribute('aria-pressed'), 'false');
+assert.equal(path.getAttribute('aria-pressed'), null);
+assert.equal(chartRef.querySelector('.section-emphasis'), null);
 await act(async () => path.dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
 assert.deepEqual(inspected, ['entry']);
 await act(async () => path.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })));
-assert.deepEqual(selected, [['entry', 40]]);
-assert.equal(path.getAttribute('aria-pressed'), 'true');
-await act(async () => path.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-assert.deepEqual(selected.at(-1), [null, null]);
-assert.equal(path.getAttribute('aria-pressed'), 'false');
+assert.equal(path.getAttribute('aria-pressed'), null);
+assert.deepEqual(inspected, ['entry']);
+await act(async () => path.dispatchEvent(new dom.window.FocusEvent('focusout', { bubbles: true })));
+assert.equal(inspected.at(-1), null);
 
 const tree = {
   nodes: [{ id: 'root', label: 'Root' }, { id: 'left', label: 'Left' }, { id: 'right', label: 'Right' }],
@@ -79,29 +77,27 @@ const tree = {
 };
 const reordered = { nodes: tree.nodes, links: [...tree.links].reverse() };
 const key = 'link:root:left';
-const renderTree = (data, selectedKey = key) => createElement(AtlasFunnel, {
-  data, variant: 'branching', options, selectedKey,
-  onSelectionChange: (next, info) => selected.push([next, info?.value ?? null]),
+const renderTree = data => createElement(AtlasFunnel, {
+  data, variant: 'branching', options,
   onInspect: info => inspected.push(info?.key ?? null),
 });
 await act(async () => root.render(renderTree(tree)));
 assert.equal(document.querySelectorAll('#app [data-key]').length, 2);
-assert.equal([...document.querySelectorAll('#app [data-key]')].find(node => node.dataset.key === key).getAttribute('aria-pressed'), 'true');
+assert([...document.querySelectorAll('#app [data-key]')].some(node => node.dataset.key === key));
 await act(async () => root.render(renderTree(reordered)));
 const selectedLink = [...document.querySelectorAll('#app [data-key]')].find(node => node.dataset.key === key);
-assert.equal(selectedLink.getAttribute('aria-pressed'), 'true');
 await act(async () => selectedLink.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true })));
-assert.deepEqual(selected.at(-1), [null, null]);
-assert.equal(selectedLink.getAttribute('aria-pressed'), 'true');
-await act(async () => root.render(renderTree(tree, 'missing-key')));
+assert.equal(selectedLink.getAttribute('aria-pressed'), null);
+await act(async () => root.render(renderTree(tree)));
 await act(async () => document.querySelector('#app [data-key]').dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
 assert.equal(inspected.at(-1), 'link:root:left');
 
 await act(async () => root.render(createElement(AtlasFunnel, { data: stages, variant: 'vertical' })));
 assert.equal(document.querySelectorAll('#app [data-stage-face]').length, 0);
 await act(async () => root.render(createElement(AtlasFunnel, {
-  data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 }, selectedKey: 'entry',
+  data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 },
 })));
+await act(async () => document.querySelector('#app [data-key="entry"]').dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
 const faces = [...document.querySelectorAll('#app [data-stage-face]')];
 assert.equal(faces.length, 4);
 assert(faces.filter(face => face.getAttribute('data-stage-face') === 'finish').every(face => face.getAttribute('fill') === PAPER));
@@ -129,4 +125,4 @@ assert.deepEqual(errors, [], 'React should hydrate the server SVG without replac
 assert(hydrateHost.querySelector('svg [data-key="entry"]'));
 await act(async () => hydrated.unmount());
 dom.window.close();
-console.log('Verified React SVG SSR and hydration, geometry options, DOM props and refs, isometric face selection, stable branching keys, and multiple SVG instances.');
+console.log('Verified React SVG SSR and hydration, geometry options, DOM props and refs, focus inspection without pinning, stable branching keys, and multiple SVG instances.');

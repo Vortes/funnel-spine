@@ -33,12 +33,9 @@ export type FunnelOptions = {
     nodeWidth?: number;
 };
 export type VerticalViewSettings = Partial<Pick<FunnelOptions, 'texture' | 'density' | 'strokeWidth' | 'patternAngle' | 'dotGain' | 'roughness' | 'paperGrain' | 'fontSize' | 'labels' | 'stageHeight' | 'stageGap' | 'capCurve' | 'borderRadius' | 'tailRatio' | 'isoDepth' | 'isoRotation'>>;
-type SharedProps = Omit<HTMLAttributes<HTMLDivElement>, 'onSelect'> & {
+type SharedProps = HTMLAttributes<HTMLDivElement> & {
     options?: FunnelOptions;
     seed?: number;
-    selectedKey?: string | null;
-    defaultSelectedKey?: string | null;
-    onSelectionChange?: (key: string | null, inspection: Inspection | null) => void;
     onInspect?: (inspection: Inspection | null) => void;
     idPrefix?: string;
     viewBox?: string;

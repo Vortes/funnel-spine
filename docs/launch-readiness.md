@@ -6,7 +6,7 @@ Before a developer launch, decide and verify these points:
 
 1. **Distribution:** choose the final package name and whether the installation model is npm, copyable source/registry, or both. The current `private: true` package is an integration candidate. A CLI or shadcn registry has not been built.
 2. **Framework matrix:** confirm full SVG server rendering and hydration in the intended frameworks, including React 18, React 19, and a Next.js client component.
-3. **Consumer matrix:** test the packed artifact in real React 18 and 19 apps, including a Next.js client component, with browser coverage for SVG patterns, WebGL fallback, keyboard focus, and touch selection.
+3. **Consumer matrix:** test the packed artifact in real React 18 and 19 apps, including a Next.js client component, with browser coverage for SVG patterns, WebGL fallback, and keyboard focus.
 4. **Performance:** record mount and update costs for large funnels and several charts on one page. The SSR vector stipple uses a compact tile; supporting browsers upgrade to a full-chart shader texture after hydration. The lab's `/lab/benchmark.html` compares shader and vector stipple but is not a consumer app benchmark.
 5. **Public docs and examples:** replace the legacy kit page's React snippet and downloadable ZIP when the package API is final. Publish a plain Markdown API reference and copyable examples for agents alongside the chosen distribution method.
 

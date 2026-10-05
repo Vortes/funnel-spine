@@ -30,7 +30,6 @@ function App() {
   const [variant, setVariant] = useState<Variant>('vertical');
   const [introToken, setIntroToken] = useState(0);
   const [view, setView] = useState<DetailView>('config');
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [inspected, setInspected] = useState<PathInfo | null>(null);
   const [infos, setInfos] = useState<PathInfo[]>([]);
   const [renderError, setRenderError] = useState<string | null>(null);
@@ -51,7 +50,6 @@ function App() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const select = useCallback((key: string | null) => setSelectedKey(key), []);
   const inspect = useCallback((info: PathInfo | null) => setInspected(info), []);
   const pathsChanged = useCallback((next: PathInfo[]) => setInfos(next), []);
   const renderFailed = useCallback((error: string | null) => setRenderError(error), []);
@@ -59,7 +57,6 @@ function App() {
   function switchVariant(next: Variant, playIntro = false) {
     if (next !== variant && playIntro) setIntroToken(current => current + 1);
     setVariant(next);
-    setSelectedKey(null);
     setInspected(null);
     setInfos([]);
     setDataError('');
@@ -70,7 +67,6 @@ function App() {
   function replaceConfig(next: LabConfig) {
     setConfigs(current => ({ ...current, [next.variant]: next }));
     setVariant(next.variant);
-    setSelectedKey(null);
     setInspected(null);
     setInfos([]);
     setDataError('');
@@ -116,7 +112,6 @@ function App() {
       validateData(data, variant);
       const next = parseConfig({ ...config, data, dataOrigin: 'custom' }) as LabConfig;
       setConfigs(current => ({ ...current, [variant]: next }));
-      setSelectedKey(null);
       setInspected(null);
       setDataError('');
       showNotice('Data applied');
@@ -148,11 +143,9 @@ function App() {
     if (!rendered) return;
     const clone = rendered.cloneNode(true) as SVGSVGElement;
     clone.classList.remove('chart-intro', 'chart-intro--vertical', 'chart-intro--continuous', 'chart-intro--branching');
-    clone.querySelectorAll('.section-emphasis').forEach(path => path.remove());
     clone.querySelectorAll('[data-key]').forEach(path => {
       path.removeAttribute('tabindex');
       path.removeAttribute('role');
-      path.removeAttribute('aria-pressed');
     });
     clone.querySelectorAll('.print-mark').forEach(mark => { mark.classList.remove('print-mark'); (mark as SVGElement).style.removeProperty('--print-step'); });
     clone.setAttribute('width', clone.getAttribute('viewBox')!.split(' ')[2]);
@@ -196,8 +189,8 @@ function App() {
       <div className="workspace">
         <PrintSettings variant={variant} options={config.options} seed={config.seed} seedDraft={seedDraft} onOptionChange={updateOption} onVerticalViewChange={changeVerticalView} onSeedDraft={setSeedDraft} onSeedCommit={commitSeed} onSample={() => sample(crypto.getRandomValues(new Uint32Array(1))[0])} onReset={() => { replaceConfig(createConfig(variant) as LabConfig); showNotice('Variant reset'); }} />
         <div className="working-area">
-          <FigurePanel config={config} introToken={introToken} selectedKey={selectedKey} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onSelect={select} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
-          <Details config={config} view={view} dataDraft={dataDraft} dataError={dataError} infos={infos} onView={next => { setView(next); if (next === 'data') setDataDraft(JSON.stringify(config.data, null, 2)); }} onDataDraft={setDataDraft} onApplyData={applyData} onRestoreData={() => sample(config.seed)} onSelectRow={key => { setSelectedKey(current => current === key ? null : key); setInspected(infos.find(info => info.key === key) ?? null); }} onCopy={() => void copy()} />
+          <FigurePanel config={config} introToken={introToken} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
+          <Details config={config} view={view} dataDraft={dataDraft} dataError={dataError} infos={infos} onView={next => { setView(next); if (next === 'data') setDataDraft(JSON.stringify(config.data, null, 2)); }} onDataDraft={setDataDraft} onApplyData={applyData} onRestoreData={() => sample(config.seed)} onCopy={() => void copy()} />
         </div>
       </div>
       <section className="saved"><div className="saved-heading"><div><span className="overline">YOUR DIRECTIONS</span><h2>Saved configurations</h2></div><label htmlFor="config-name">Name this configuration <input id="config-name" value={configName} onChange={event => setConfigName(event.target.value)} placeholder="e.g. Fine hatch, wide spacing" maxLength={80} /></label></div>

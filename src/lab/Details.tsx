@@ -3,7 +3,7 @@ import { format, percent } from './utils';
 
 export type DetailView = 'config' | 'data' | 'compare';
 
-export function Details({ config, view, dataDraft, dataError, infos, onView, onDataDraft, onApplyData, onRestoreData, onSelectRow, onCopy }: {
+export function Details({ config, view, dataDraft, dataError, infos, onView, onDataDraft, onApplyData, onRestoreData, onCopy }: {
   config: LabConfig;
   view: DetailView;
   dataDraft: string;
@@ -13,7 +13,6 @@ export function Details({ config, view, dataDraft, dataError, infos, onView, onD
   onDataDraft: (value: string) => void;
   onApplyData: () => void;
   onRestoreData: () => void;
-  onSelectRow: (key: string) => void;
   onCopy: () => void;
 }) {
   return <section className="details">
@@ -28,7 +27,7 @@ export function Details({ config, view, dataDraft, dataError, infos, onView, onD
       <p id="data-error" role="alert">{dataError}</p>
     </div>
     <div id="compare-view" className="table-scroll" hidden={view !== 'compare'}><table><thead><tr><th>Path / stage</th><th>Quantity</th><th>Conversion</th><th>Of total</th></tr></thead>
-      <tbody id="rows">{infos.map(info => <tr key={info.key}><td><button onClick={() => onSelectRow(info.key)}>{info.label}</button></td><td>{format(info.value)}</td><td>{percent(info.value, info.denominator)}</td><td>{percent(info.value, info.total)}</td></tr>)}</tbody>
+      <tbody id="rows">{infos.map(info => <tr key={info.key}><td>{info.label}</td><td>{format(info.value)}</td><td>{percent(info.value, info.denominator)}</td><td>{percent(info.value, info.total)}</td></tr>)}</tbody>
     </table><p>{config.variant === 'branching' ? 'Conversion uses the parent bucket quantity. Every split accounts for 100%, including drop-off.' : 'Conversion uses the preceding stage quantity. Of total uses the entry quantity.'}</p></div>
   </section>;
 }

@@ -855,7 +855,7 @@ function connectedLinks(model, key) {
   walk(active.inspection.target, false);
   return linked;
 }
-function Mark({ mark, idPrefix, activeKey, visibleKeys, selectedKey, roughness, onPreview, onLeave, onChoose, onClear }) {
+function Mark({ mark, idPrefix, activeKey, visibleKeys, roughness, onPreview, onLeave }) {
   if (mark.type === "line") return /* @__PURE__ */ jsx2(
     "line",
     {
@@ -900,70 +900,37 @@ function Mark({ mark, idPrefix, activeKey, visibleKeys, selectedKey, roughness, 
   const clipPath = mark.clipId ? `url(#${idPrefix}-${mark.clipId})` : void 0;
   const mask = mark.maskSide ? `url(#${idPrefix}-fade-${mark.maskSide})` : void 0;
   const stroke = mark.stroke === false ? void 0 : INK2;
-  const onKeyDown = (event) => {
-    if (!inspection) return;
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onChoose(inspection);
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      onClear();
+  return /* @__PURE__ */ jsx2(Fragment2, { children: /* @__PURE__ */ jsx2(
+    "path",
+    {
+      d: mark.d,
+      fill,
+      stroke,
+      strokeWidth: mark.strokeWidth,
+      strokeLinejoin: mark.lineJoin,
+      strokeDasharray: inspection && !visible ? "2 4" : void 0,
+      clipPath,
+      mask,
+      filter: inspection && roughness > 0 ? `url(#${idPrefix}-edge)` : void 0,
+      "data-base-fill": baseFill,
+      "data-key": inspection?.key,
+      "data-stage-face": mark.face ? mark.stageId : void 0,
+      "data-face": mark.face,
+      "data-stage-outline": mark.outline ? mark.stageId : void 0,
+      role: inspection ? "img" : void 0,
+      tabIndex: inspection ? 0 : void 0,
+      "aria-label": inspection ? `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` : void 0,
+      pointerEvents: mark.face || mark.outline ? "none" : void 0,
+      onPointerDown: inspection ? (event) => event.preventDefault() : void 0,
+      onPointerEnter: inspection ? (event) => {
+        if (event.pointerType === "mouse") onPreview(inspection);
+      } : void 0,
+      onPointerLeave: inspection ? onLeave : void 0,
+      onFocus: inspection ? () => onPreview(inspection) : void 0,
+      onBlur: inspection ? onLeave : void 0,
+      children: inspection && /* @__PURE__ */ jsx2("title", { children: `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` })
     }
-  };
-  return /* @__PURE__ */ jsxs2(Fragment2, { children: [
-    /* @__PURE__ */ jsx2(
-      "path",
-      {
-        d: mark.d,
-        fill,
-        stroke,
-        strokeWidth: mark.strokeWidth,
-        strokeLinejoin: mark.lineJoin,
-        strokeDasharray: inspection && !visible ? "2 4" : void 0,
-        clipPath,
-        mask,
-        filter: inspection && roughness > 0 ? `url(#${idPrefix}-edge)` : void 0,
-        "data-base-fill": baseFill,
-        "data-key": inspection?.key,
-        "data-stage-face": mark.face ? mark.stageId : void 0,
-        "data-face": mark.face,
-        "data-stage-outline": mark.outline ? mark.stageId : void 0,
-        role: inspection ? "button" : void 0,
-        tabIndex: inspection ? 0 : void 0,
-        "aria-label": inspection ? `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` : void 0,
-        "aria-pressed": inspection ? selectedKey === inspection.key : void 0,
-        pointerEvents: mark.face || mark.outline ? "none" : void 0,
-        style: inspection ? { cursor: "pointer" } : void 0,
-        onPointerEnter: inspection ? (event) => {
-          if (event.pointerType === "mouse") onPreview(inspection);
-        } : void 0,
-        onPointerLeave: inspection ? onLeave : void 0,
-        onFocus: inspection ? () => onPreview(inspection) : void 0,
-        onBlur: inspection ? onLeave : void 0,
-        onClick: inspection ? () => onChoose(inspection) : void 0,
-        onKeyDown: inspection ? onKeyDown : void 0,
-        children: inspection && /* @__PURE__ */ jsx2("title", { children: `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` })
-      }
-    ),
-    inspection && /* @__PURE__ */ jsx2(
-      "path",
-      {
-        d: mark.d,
-        fill: "none",
-        stroke: INK2,
-        strokeWidth: 1,
-        vectorEffect: "non-scaling-stroke",
-        opacity: 0,
-        className: "section-emphasis",
-        "aria-hidden": "true",
-        pointerEvents: "none",
-        "data-emphasis": String(Boolean(activeKey) && visible),
-        "data-emphasis-key": inspection.key,
-        clipPath,
-        mask
-      }
-    )
-  ] });
+  ) });
 }
 function FadeDefs({ model, idPrefix }) {
   return /* @__PURE__ */ jsxs2("defs", { children: [
@@ -992,9 +959,6 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
   variant = "continuous",
   options = emptyOptions,
   seed = 1234,
-  selectedKey,
-  defaultSelectedKey = null,
-  onSelectionChange,
   onInspect,
   idPrefix: suppliedPrefix,
   viewBox,
@@ -1012,34 +976,16 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
   if (variant === "vertical" && normalized.verticalViews) {
     buildChartModel(data, "vertical", { ...normalized, ...normalized.verticalViews.isometric, verticalView: "isometric" });
   }
-  const [internalKey, setInternalKey] = useState2(defaultSelectedKey);
   const [hoverKey, setHoverKey] = useState2(null);
-  const controlled = selectedKey !== void 0;
-  const requestedKey = controlled ? selectedKey : internalKey;
   const inspections = useMemo(() => new Map(model.marks.flatMap((mark) => mark.type === "path" && mark.inspection ? [[mark.inspection.key, mark.inspection]] : [])), [model]);
-  const chosenKey = requestedKey && inspections.has(requestedKey) ? requestedKey : null;
-  const activeKey = chosenKey ?? (hoverKey && inspections.has(hoverKey) ? hoverKey : null);
+  const activeKey = hoverKey && inspections.has(hoverKey) ? hoverKey : null;
   const visibleKeys = useMemo(() => activeKey && model.variant === "branching" ? connectedLinks(model, activeKey) : null, [model, activeKey]);
   const preview = (info) => {
-    if (chosenKey) return;
     setHoverKey(info.key);
     onInspect?.(info);
   };
   const leave = () => {
     setHoverKey(null);
-    onInspect?.(chosenKey ? inspections.get(chosenKey) : null);
-  };
-  const choose = (info) => {
-    const next = chosenKey === info.key ? null : info.key;
-    if (!controlled) setInternalKey(next);
-    setHoverKey(null);
-    onSelectionChange?.(next, next ? info : null);
-  };
-  const clear = () => {
-    if (!chosenKey) return;
-    if (!controlled) setInternalKey(null);
-    setHoverKey(null);
-    onSelectionChange?.(null, null);
     onInspect?.(null);
   };
   return /* @__PURE__ */ jsx2("div", { ...rootProps, ref, style: { display: "block", ...style }, children: /* @__PURE__ */ jsxs2(
@@ -1076,12 +1022,9 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
             idPrefix,
             activeKey,
             visibleKeys,
-            selectedKey: chosenKey,
             roughness: normalized.roughness ?? 0.15,
             onPreview: preview,
-            onLeave: leave,
-            onChoose: choose,
-            onClear: clear
+            onLeave: leave
           },
           mark.key
         )),

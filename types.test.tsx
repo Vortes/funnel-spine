@@ -8,7 +8,7 @@ const graph: FunnelGraph = {
 const inspect: (info: Inspection | null) => void = () => {};
 
 <AtlasFunnel data={stages} onInspect={inspect} aria-label="Conversion chart" />;
-<AtlasFunnel data={graph} variant="branching" selectedKey={null} onSelectionChange={(_, info) => inspect(info)} />;
+<AtlasFunnel data={graph} variant="branching" onInspect={inspect} />;
 <AtlasFunnel data={stages} variant="vertical" options={{ texture: 'dense', borderRadius: 12 }} />;
 <AtlasFunnel data={stages} variant="vertical" options={{ verticalView: 'isometric', isoDepth: 48, isoRotation: -30, tailRatio: 0.6 }} />;
 <AtlasFunnel data={stages} variant="vertical" options={{ verticalView: 'flat', verticalViews: { flat: { texture: 'hatch' }, isometric: { texture: 'mixed', isoDepth: 36 } } }} />;

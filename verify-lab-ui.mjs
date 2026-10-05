@@ -42,10 +42,9 @@ assert.equal(document.querySelector('[data-variant="branching"]').getAttribute('
 assert.equal(document.querySelectorAll('#canvas [data-key]').length, 10);
 assert.match(document.querySelector('#figure-title').textContent, /Branching funnel/);
 document.querySelector('#canvas [data-key]').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true }));
-await waitFor(() => Boolean(document.querySelector('#unpin')), 'pinned path');
-assert.equal(document.querySelector('#canvas [data-key]').getAttribute('aria-pressed'), 'true');
-document.querySelector('#unpin').click();
-await waitFor(() => !document.querySelector('#unpin'), 'unpinned path');
+assert.equal(document.querySelector('#unpin'), null);
+assert.equal(document.querySelector('#canvas [data-key]').getAttribute('aria-pressed'), null);
+assert.match(document.querySelector('.caption').textContent, /Hover or focus to inspect/);
 document.querySelector('[data-view="data"]').click();
 await waitFor(() => !document.querySelector('#data-view').hidden, 'data editor');
 const textarea = document.querySelector('#data');
