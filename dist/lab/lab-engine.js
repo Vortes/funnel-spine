@@ -45,8 +45,41 @@ function verticalStagePath(center,y,height,w,w2,gap,capCurve,topRadius,bottomRad
  const rightSideBottom=rightBottom+(right-rightBottom)*bottomSideT,leftSideBottom=leftBottom+(left-leftBottom)*bottomSideT;
  return `M ${left+topRadius} ${y+topInset} Q ${center} ${y+capCurve-topInset} ${right-topRadius} ${y+topInset} Q ${right} ${y} ${rightSideTop} ${y+topRadius} L ${rightSideBottom} ${bottom-bottomRadius} Q ${rightBottom} ${bottom} ${rightBottom-bottomRadius} ${bottom+bottomInset} Q ${center} ${bottom+capCurve/4-bottomInset} ${leftBottom+bottomRadius} ${bottom+bottomInset} Q ${leftBottom} ${bottom} ${leftSideBottom} ${bottom-bottomRadius} L ${leftSideTop} ${y+topRadius} Q ${left} ${y} ${left+topRadius} ${y+topInset} Z`;
 }
-export function renderFunnel(data,{variant='continuous',texture='dense',density=7,strokeWidth=.5,color=INK,labels=true,curve=.5,idPrefix='atlas',chartHeight=235,edgeFade=0,stageHeight=310,stageGap=9,capCurve=12,borderRadius=0,tailRatio=.65,nodeGap=66,nodeWidth=2.5,patternAngle=-45,dotGain=.03,roughness=.15,paperGrain=false,seed=1234,fontSize=14,guides=true,stippleScale=2}={}) {
- if(!['continuous','vertical','branching'].includes(variant))throw new Error('Unknown funnel variant.');validateData(data,variant);
+function roundedPolygonPath(points,radius){
+ if(!radius)return `M ${points.map(p=>`${p.x} ${p.y}`).join(' L ')} Z`;
+ const corners=points.map((point,i)=>{
+  const previous=points[(i+points.length-1)%points.length],next=points[(i+1)%points.length];
+  const before=Math.hypot(point.x-previous.x,point.y-previous.y),after=Math.hypot(next.x-point.x,next.y-point.y),trim=Math.min(radius,before/2,after/2);
+  return {point,entry:{x:point.x+(previous.x-point.x)*trim/before,y:point.y+(previous.y-point.y)*trim/before},exit:{x:point.x+(next.x-point.x)*trim/after,y:point.y+(next.y-point.y)*trim/after}};
+ });
+ return `M ${corners[0].entry.x} ${corners[0].entry.y} ${corners.map(({point,exit},i)=>`Q ${point.x} ${point.y} ${exit.x} ${exit.y} L ${corners[(i+1)%corners.length].entry.x} ${corners[(i+1)%corners.length].entry.y}`).join(' ')} Z`;
+}
+export function isometricStageGeometry(data,{stageHeight=310,stageGap=20,tailRatio=.65,isoDepth=36,isoRotation=30,borderRadius=0}={}){
+ const center=360,topY=70,angle=isoRotation*Math.PI/180,baseline=Math.cos(Math.PI/6);
+ const dx=isoDepth*Math.sin(angle)/.5,rise=isoDepth*Math.cos(angle)/(baseline*Math.sqrt(3));
+ const {widths:linearWidths}=verticalRimGeometry(data,{stageHeight,stageGap,tailRatio}),widths=linearWidths.map(width=>width*Math.cos(angle)/baseline);
+ if(widths.some((width,i)=>i&&width>=widths[i-1]))throw new Error('Isometric stages need decreasing quantities and a terminal taper below 100%.');
+ const scale=stageHeight/(widths[0]-widths.at(-1));
+ const rimY=widths.map(width=>topY+(widths[0]-width)*scale);
+ return data.map((stage,i)=>{
+  const y=rimY[i],nextY=rimY[i+1],gap=i<data.length-1?Math.min(stageGap,(nextY-y)*.65):0,bottom=nextY-gap;
+  const bottomWidth=widths[0]-(bottom-topY)/scale,left=center-widths[i]/2,right=center+widths[i]/2,leftBottom=center-bottomWidth/2,rightBottom=center+bottomWidth/2;
+  const outline=dx>=0?[
+   {x:left,y},{x:left+dx,y:y-rise},{x:right+dx,y:y-rise},{x:rightBottom+dx,y:bottom-rise},{x:rightBottom,y:bottom},{x:leftBottom,y:bottom}
+  ]:[
+   {x:right,y},{x:right+dx,y:y-rise},{x:left+dx,y:y-rise},{x:leftBottom+dx,y:bottom-rise},{x:leftBottom,y:bottom},{x:rightBottom,y:bottom}
+  ];
+  return {
+   key:stage.id,y,bottom,right,outerRight:right+Math.max(0,dx),topWidth:widths[i],bottomWidth,outline:roundedPolygonPath(outline,borderRadius),
+   front:`M ${left} ${y} L ${right} ${y} L ${rightBottom} ${bottom} L ${leftBottom} ${bottom} Z`,
+   top:`M ${left} ${y} L ${left+dx} ${y-rise} L ${right+dx} ${y-rise} L ${right} ${y} Z`,
+   side:dx>=0?`M ${right} ${y} L ${right+dx} ${y-rise} L ${rightBottom+dx} ${bottom-rise} L ${rightBottom} ${bottom} Z`:
+    `M ${left} ${y} L ${left+dx} ${y-rise} L ${leftBottom+dx} ${bottom-rise} L ${leftBottom} ${bottom} Z`
+  };
+ });
+}
+export function renderFunnel(data,{variant='continuous',texture='dense',density=7,strokeWidth=.5,color=INK,labels=true,curve=.5,idPrefix='atlas',chartHeight=235,edgeFade=0,stageHeight=310,stageGap=9,capCurve=12,borderRadius=0,tailRatio=.65,isoDepth=36,isoRotation=30,nodeGap=66,nodeWidth=2.5,patternAngle=-45,dotGain=.03,roughness=.15,paperGrain=false,seed=1234,fontSize=14,guides=true,stippleScale=2}={}) {
+ if(!['continuous','vertical','isometric','branching'].includes(variant))throw new Error('Unknown funnel variant.');validateData(data,variant);
  if(texture!=='mixed'&&!screenTypes.includes(texture))throw new Error('Choose a supported screen pattern.');
  const graph=variant==='branching'?layoutGraph(data,{nodeGap,nodeWidth}):null;
  const height=graph?.height??460,width=graph?.width??900;
@@ -68,6 +101,12 @@ export function renderFunnel(data,{variant='continuous',texture='dense',density=
   const max=data[0].value||1;
   if(variant==='continuous'){
    const step=790/(data.length-1);const base=365;if(guides){for(const ratio of [0,.25,.5,.75,1]){const y=base-chartHeight*ratio;svg.append(make('line',{x1:38,y1:y,x2:46,y2:y,stroke:color,'stroke-width':.4}),text(31,y+3,`${Math.round(ratio*100)}`,10,{'text-anchor':'end'}));}svg.append(text(31,base-chartHeight-13,'%',10,{'text-anchor':'end'}));}data.forEach((s,i)=>{const x=50+i*step,h=s.value/max*chartHeight;svg.append(make('line',{x1:x,y1:96,x2:x,y2:386,stroke:color,'stroke-dasharray':'2 5'}));if(labels){svg.append(text(x,59,s.label,fontSize,{'text-anchor':i===data.length-1?'end':'start'}));svg.append(text(x,81,fmt(s.value),fontSize-2,{'text-anchor':i===data.length-1?'end':'start'}));}if(i<data.length-1){const next=data[i+1],h2=next.value/max*chartHeight;const xx=x+step,c=step*curve;const d=`M ${x} ${base-h} C ${x+c} ${base-h} ${xx-c} ${base-h2} ${xx} ${base-h2} L ${xx} ${base} L ${x} ${base} Z`;const fadeSide=i===0&&i===data.length-2?'both':i===0?'left':i===data.length-2?'right':null;interactive(make('path',{d,fill:chooseScreen(i),stroke:color,'stroke-width':strokeWidth,...(edgeFade>0&&fadeSide?{mask:`url(#${idPrefix}-fade-${fadeSide})`}:{})}),s.id,{label:`${s.label} → ${next.label}`,value:next.value,denominator:s.value,total:max,kind:'stage'});}svg.append(text(x,417,`${String(i+1).padStart(2,'0')} / ${pct(s.value,max)}`,12,{'text-anchor':i===data.length-1?'end':'start'}));});if(!edgeFade)svg.append(make('line',{x1:50,y1:365,x2:840,y2:365,stroke:color,'stroke-width':strokeWidth}));
+  }else if(variant==='isometric'){
+   const stages=isometricStageGeometry(data,{stageHeight,stageGap,tailRatio,isoDepth,isoRotation,borderRadius});
+   if(borderRadius){const clips=make('defs');stages.forEach((stage,i)=>{const clip=make('clipPath',{id:`${idPrefix}-stage-clip-${i}`,clipPathUnits:'userSpaceOnUse'});clip.append(make('path',{d:stage.outline}));clips.append(clip);});svg.append(clips);}
+   for(const [i,stage] of stages.entries()){const clip=borderRadius?{'clip-path':`url(#${idPrefix}-stage-clip-${i})`}:{};for(const [face,d,type] of [['side',stage.side,'cross'],['top',stage.top,'am']]){const path=make('path',{d,fill:`url(#${idPrefix}-${type})`,stroke:color,'stroke-width':strokeWidth,'pointer-events':'none','data-stage-face':stage.key,'data-face':face,'data-base-fill':`url(#${idPrefix}-${type})`,...clip});svg.append(path);}}
+   stages.forEach((stage,i)=>{const s=data[i],clip=borderRadius?{'clip-path':`url(#${idPrefix}-stage-clip-${i})`}:{};interactive(make('path',{d:stage.front,fill:chooseScreen(i),stroke:color,'stroke-width':strokeWidth,...clip}),s.id,{label:s.label,value:s.value,denominator:data[i-1]?.value??max,total:max,kind:'stage'});});
+   if(labels)stages.forEach((stage,i)=>{const s=data[i],mid=(stage.y+stage.bottom)/2;svg.append(text(52,mid,`${String(i+1).padStart(2,'0')}`,12));svg.append(make('line',{x1:stage.outerRight+12,y1:mid,x2:655,y2:mid,stroke:color,'stroke-width':.5,'stroke-dasharray':'2 3'}));svg.append(text(670,mid-4,s.label,fontSize));svg.append(text(670,mid+15,`${fmt(s.value)} · ${pct(s.value,max)}`,fontSize-2));});
   }else{
    const height=stageHeight/data.length,center=390,{widths,radii}=verticalRimGeometry(data,{stageHeight,stageGap,tailRatio,borderRadius});data.forEach((s,i)=>{const y=70+i*height,w=widths[i],w2=widths[i+1],gap=stageGap;const d=verticalStagePath(center,y,height,w,w2,gap,capCurve,radii[i],radii[i+1]);interactive(make('path',{d,fill:chooseScreen(i),stroke:color,'stroke-width':strokeWidth}),s.id,{label:s.label,value:s.value,denominator:data[i-1]?.value??max,total:max,kind:'stage'});if(labels){svg.append(text(52,y+height/2,`${String(i+1).padStart(2,'0')}`,12));svg.append(make('line',{x1:center+w/2+12,y1:y+height/2,x2:655,y2:y+height/2,stroke:color,'stroke-width':.5,'stroke-dasharray':'2 3'}));svg.append(text(670,y+height/2-4,s.label,fontSize));svg.append(text(670,y+height/2+15,`${fmt(s.value)} · ${pct(s.value,max)}`,fontSize-2));}});
   }

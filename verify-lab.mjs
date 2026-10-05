@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 globalThis.HTMLElement=class {};
 const {variants,createConfig,parseConfig,sampleData}=await import('./dist/lab/config.js');
-const {layoutGraph,renderFunnel,edgeFadeStops,verticalRimGeometry}=await import('./dist/lab/lab-engine.js');
+const {layoutGraph,renderFunnel,edgeFadeStops,verticalRimGeometry,isometricStageGeometry}=await import('./dist/lab/lab-engine.js');
 for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=g.bottom+1e-8);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
 const vertical=createConfig('vertical');assert.equal(vertical.options.stageGap,4);assert.equal(vertical.options.tailRatio,.6);assert.equal(vertical.options.borderRadius,4);assert.equal(vertical.options.edgeFade,0);
+const isometric=createConfig('isometric');assert.equal(isometric.options.isoDepth,36);assert.equal(isometric.options.isoRotation,30);assert.equal(isometric.options.stageGap,20);assert.deepEqual(isometric.data,vertical.data);
 const presetRims=verticalRimGeometry(vertical.data,vertical.options);assert.equal(presetRims.radii[0],4);assert(presetRims.widths.every((width,i)=>!i||width<=presetRims.widths[i-1]));
 const previousVertical=structuredClone(vertical);delete previousVertical.options.borderRadius;assert.equal(parseConfig(previousVertical).options.borderRadius,0);
 function verifySeparateRibbons(data,options={}){
@@ -51,6 +52,44 @@ assert(fadedRibbons.slice(1,-1).every(path=>!path.attrs.mask));
 const singleRibbon=renderFunnel(createConfig('continuous').data.slice(0,2),{variant:'continuous',edgeFade:.35});
 assert.equal(singleRibbon.children.find(child=>child.attrs['data-key']).attrs.mask,'url(#atlas-fade-both)');
 const verticalData=createConfig('vertical').data;
+const projected=isometricStageGeometry(isometric.data,isometric.options);
+assert.equal(projected.length,isometric.data.length);
+const commonTaper=(projected[0].topWidth-projected.at(-1).bottomWidth)/isometric.options.stageHeight;
+for(let i=0;i<projected.length;i++){
+ const stage=projected[i],front=stage.front.match(/-?\d+(?:\.\d+)?/g).map(Number),top=stage.top.match(/-?\d+(?:\.\d+)?/g).map(Number);
+ assert(Math.abs(stage.topWidth-460*isometric.data[i].value/isometric.data[0].value)<1e-8);
+ assert(Math.abs((stage.topWidth-stage.bottomWidth)/(stage.bottom-stage.y)-commonTaper)<1e-8);
+ assert(Math.abs(front[2]-front[0]-stage.topWidth)<1e-8);
+ assert(Math.abs(top[2]-front[0]-isometric.options.isoDepth)<1e-8);
+ assert(Math.abs(top[3]-front[1]+isometric.options.isoDepth/Math.sqrt(3))<1e-8);
+ if(i){assert(projected[i-1].bottom<stage.y);assert(stage.y-projected[i-1].bottom<=isometric.options.stageGap+1e-8);}
+}
+const flat=structuredClone(isometric);flat.data[1].value=flat.data[0].value;assert.throws(()=>parseConfig(flat),/decreasing quantities/);
+const untapered=structuredClone(isometric);untapered.options.tailRatio=1;assert.throws(()=>parseConfig(untapered),/terminal taper/);
+const isoSvg=renderFunnel(isometric.data,{...isometric.options,variant:'isometric'});
+assert.equal(isoSvg.children.filter(child=>child.attrs['data-key']).length,isometric.data.length);
+assert.equal(isoSvg.children.filter(child=>child.attrs['data-stage-face']).length,isometric.data.length*2);
+const isoPatternIds=new Set(isoSvg.children.filter(child=>child.tag==='defs').flatMap(defs=>defs.children.map(child=>child.attrs.id)));
+assert(isoSvg.children.filter(child=>child.attrs['data-stage-face']).every(face=>isoPatternIds.has(face.attrs.fill.match(/^url\(#(.+)\)$/)?.[1])));
+for(const rotation of [-30,30]){
+ const options={...isometric.options,isoRotation:rotation,borderRadius:16},geometry=isometricStageGeometry(isometric.data,options),roundedIso=renderFunnel(isometric.data,{...options,variant:'isometric'});
+ assert(geometry.every(stage=>stage.outline.includes('Q')&&!stage.outline.includes('NaN')));
+ assert(roundedIso.children.filter(child=>child.attrs['data-key']).every(path=>path.attrs['clip-path']?.startsWith('url(#atlas-stage-clip-')));
+ assert.equal(roundedIso.children.filter(child=>child.attrs['data-stage-face']&&child.attrs['clip-path']).length,isometric.data.length*2);
+}
+for(const rotation of [-45,0,30,45]){
+ const stages=isometricStageGeometry(isometric.data,{...isometric.options,isoRotation:rotation});
+ const expectedShift=isometric.options.isoDepth*Math.sin(rotation*Math.PI/180)/.5;
+ const taper=(stages[0].topWidth-stages.at(-1).bottomWidth)/isometric.options.stageHeight;
+ for(const stage of stages){
+  const front=stage.front.match(/-?\d+(?:\.\d+)?/g).map(Number),top=stage.top.match(/-?\d+(?:\.\d+)?/g).map(Number);
+  assert(Math.abs(top[2]-front[0]-expectedShift)<1e-8);
+  assert(Math.abs((stage.topWidth-stage.bottomWidth)/(stage.bottom-stage.y)-taper)<1e-8);
+ }
+}
+const leftView=isometricStageGeometry(isometric.data,{...isometric.options,isoRotation:-30});
+assert(leftView[0].top.match(/-?\d+(?:\.\d+)?/g).map(Number)[2]<leftView[0].front.match(/-?\d+(?:\.\d+)?/g).map(Number)[0]);
+const invalidRotation=structuredClone(isometric);invalidRotation.options.isoRotation=50;assert.throws(()=>parseConfig(invalidRotation),/isoRotation/);
 const square=renderFunnel(verticalData,{variant:'vertical',borderRadius:0});
 const rounded=renderFunnel(verticalData,{variant:'vertical',borderRadius:20});
 const ribbons=svg=>svg.children.filter(child=>child.attrs['data-key']);
@@ -67,4 +106,4 @@ for(const variant of variants){const config=createConfig(variant);config.options
 const mixSwatch=screenSwatch('mixed');assert.equal(mixSwatch.children.filter(child=>child.tag==='rect').length,screenTypes.length+1);
 for(const texture of ['sparse','stipple','solid']){const old=createConfig('continuous');old.options.texture=texture;assert.equal(parseConfig(old).options.texture,'dense');}
 assert.deepEqual(screenTypes,['dense','am','hatch','cross','coarse']);
-console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, edge fades, vertical rim widths and heights, rounded vertical stages, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');
+console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, edge fades, vertical rim widths and heights, rounded vertical and rotated isometric stages, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');

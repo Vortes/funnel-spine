@@ -239,3 +239,8 @@ export const defaultConfigs={
     }
   }
 };
+defaultConfigs.isometric={
+  ...structuredClone(defaultConfigs.vertical),
+  variant:'isometric',
+  options:{...defaultConfigs.vertical.options,stageGap:20,capCurve:0,borderRadius:0,isoDepth:36,isoRotation:30}
+};
