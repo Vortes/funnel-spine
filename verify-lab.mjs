@@ -5,9 +5,9 @@ const {layoutGraph,renderFunnel,edgeFadeStops,verticalRimGeometry,isometricStage
 for(const variant of variants){for(const seed of [0,1,1234,4294967295]){const config=createConfig(variant,seed);assert.deepEqual(sampleData(variant,seed),config.data);assert.deepEqual(parseConfig(JSON.parse(JSON.stringify(config))),config);if(variant==='branching'){for(const nodeGap of [28,85])for(const nodeWidth of [1,6]){const g=layoutGraph(config.data,{nodeGap,nodeWidth});for(const n of g.nodes){assert(n.y+n.height<=g.bottom+1e-8);assert(Number.isFinite(n.x));for(const l of n.outgoing)assert(l.sy+l.width<=n.y+n.height+1e-8);}}}else{assert(config.data.every((n,i)=>!i||n.value<=config.data[i-1].value));}}}
 assert.deepEqual(variants,['continuous','vertical','branching']);
 for(const variant of variants)assert.equal(createConfig(variant).options.texture,'mixed');
-const vertical=createConfig('vertical'),isometric=vertical;assert.equal(vertical.options.verticalView,'isometric');assert.equal(vertical.options.stageGap,20);assert.equal(vertical.options.tailRatio,.6);assert.equal(vertical.options.borderRadius,0);assert.equal(vertical.options.edgeFade,0);
+const vertical=createConfig('vertical'),isometric=vertical;assert.equal(vertical.seed,1515972923);assert.deepEqual(vertical.data,sampleData('vertical',vertical.seed));assert.deepEqual(vertical.data.map(stage=>stage.value),[14500,10407,6960,3676,1676]);assert.equal(vertical.options.verticalView,'isometric');assert.equal(vertical.options.stageGap,20);assert.equal(vertical.options.tailRatio,.15);assert.equal(vertical.options.borderRadius,3);assert.equal(vertical.options.paperGrain,true);assert.equal(vertical.options.edgeFade,0);
 assert.equal(isometric.options.isoDepth,36);assert.equal(isometric.options.isoRotation,30);
-const presetRims=verticalRimGeometry(vertical.data,vertical.options);assert.equal(presetRims.radii[0],0);assert(presetRims.widths.every((width,i)=>!i||width<=presetRims.widths[i-1]));
+const presetRims=verticalRimGeometry(vertical.data,vertical.options);assert.equal(presetRims.radii[0],3);assert(presetRims.widths.every((width,i)=>!i||width<=presetRims.widths[i-1]));
 const oldVertical=structuredClone(vertical);delete oldVertical.options.verticalView;oldVertical.options.stageGap=4;oldVertical.options.borderRadius=4;assert.equal(parseConfig(oldVertical).options.verticalView,'flat');
 const oldIsometric=structuredClone(vertical);oldIsometric.variant='isometric';delete oldIsometric.options.verticalView;const migratedIsometric=parseConfig(oldIsometric);assert.equal(migratedIsometric.variant,'vertical');assert.equal(migratedIsometric.options.verticalView,'isometric');
 const invalidView=structuredClone(vertical);invalidView.options.verticalView='sideways';assert.throws(()=>parseConfig(invalidView),/vertical view/);
@@ -85,7 +85,8 @@ for(const rotation of [-30,30]){
  assert.equal(roundedIso.children.filter(child=>child.attrs['data-stage-face']&&child.attrs['clip-path']).length,isometric.data.length*2);
  const outlines=roundedIso.children.filter(child=>child.attrs['data-stage-outline']);assert.equal(outlines.length,geometry.length);outlines.forEach((outline,i)=>{assert.equal(outline.attrs.d,geometry[i].outline);assert.equal(outline.attrs.fill,'none');assert.equal(outline.attrs['pointer-events'],'none');assert(!outline.attrs['clip-path']);});
 }
-assert.equal(isoSvg.children.filter(child=>child.attrs['data-stage-outline']).length,0);
+assert.equal(isoSvg.children.filter(child=>child.attrs['data-stage-outline']).length,isometric.data.length);
+const squareIso=renderFunnel(isometric.data,{...isometric.options,variant:'vertical',borderRadius:0});assert.equal(squareIso.children.filter(child=>child.attrs['data-stage-outline']).length,0);
 for(const rotation of [-45,0,30,45]){
  const stages=isometricStageGeometry(isometric.data,{...isometric.options,isoRotation:rotation});
  const expectedShift=isometric.options.isoDepth*Math.sin(rotation*Math.PI/180)/.5;
