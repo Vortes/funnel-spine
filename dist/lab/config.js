@@ -28,11 +28,11 @@ export function parseConfig(input){
  if(!input.options||typeof input.options!=='object')throw new Error('The configuration needs an options object.');
  const source={...input.options};
  if(input.version===1){source.strokeWidth=Math.min(.75,Math.max(.25,(source.strokeWidth??1)*.75));source.nodeWidth=Math.min(6,Math.max(1,source.nodeWidth??2.5));}
- if(['stipple','solid','mixed','sparse'].includes(source.texture))source.texture='dense';
+ if(['stipple','solid','sparse'].includes(source.texture))source.texture='dense';
  const options={...defaultOptions,...defaultConfigs[input.variant].options};
  if(input.variant==='vertical'&&source.borderRadius===undefined)options.borderRadius=0;
  for(const[key,[min,max]]of Object.entries(ranges)){if(source[key]!==undefined){const value=source[key];if(!Number.isFinite(value)||value<min||value>max)throw new Error(`${key} must be between ${min} and ${max}.`);options[key]=value;}}
- if(!screenTypes.includes(source.texture))throw new Error('Choose a supported screen pattern.');options.texture=source.texture;
+ if(source.texture!=='mixed'&&!screenTypes.includes(source.texture))throw new Error('Choose a supported screen pattern.');options.texture=source.texture;
  for(const key of ['labels','guides','paperGrain']){if(source[key]!==undefined){if(typeof source[key]!=='boolean')throw new Error(`${key} must be true or false.`);options[key]=source[key];}}
  const data=input.version<3&&input.variant==='branching'&&input.dataOrigin==='seed'?sampleData('branching',input.seed):input.data;
  validateData(data,input.variant);if(input.variant==='branching')layoutGraph(data,options);

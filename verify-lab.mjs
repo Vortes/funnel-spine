@@ -32,7 +32,7 @@ const migrated=parseConfig(legacy);assert.equal(migrated.version,3);assert.equal
 const previous=createConfig('continuous');delete previous.options.edgeFade;delete previous.options.borderRadius;assert.equal(parseConfig(previous).options.edgeFade,0);assert.equal(parseConfig(previous).options.borderRadius,0);
 const invalidFade=createConfig('continuous');invalidFade.options.edgeFade=.5;assert.throws(()=>parseConfig(invalidFade),/edgeFade/);
 const invalidRadius=createConfig('vertical');invalidRadius.options.borderRadius=21;assert.throws(()=>parseConfig(invalidRadius),/borderRadius/);
-const {screenDefs,screenTypes,stippleField,INK,PAPER}=await import('./dist/lab/screens.js');
+const {screenDefs,screenTypes,screenSwatch,stippleField,INK,PAPER}=await import('./dist/lab/screens.js');
 class Element{constructor(tag){this.tag=tag;this.attrs={};this.children=[];}setAttribute(key,value){this.attrs[key]=value;}getAttribute(key){return this.attrs[key]??null;}append(...children){this.children.push(...children);}}
 globalThis.document={createElementNS:(_,tag)=>new Element(tag)};
 const first=screenDefs({seed:1234}),same=screenDefs({seed:1234}),different=screenDefs({seed:1235});assert.deepEqual(first,same);assert.notDeepEqual(first,different);
@@ -63,6 +63,8 @@ for(const seed of [0,1,1234,4294967295])for(const gap of [0,20])for(const radius
  spans.forEach((span,i)=>{assert(Math.abs(span.top-(widths[i]-2*radii[i]))<1e-8);assert(Math.abs(span.bottom-(widths[i+1]-2*radii[i+1]))<1e-8);if(i){assert(Math.abs(span.y-spans[i-1].y-330/data.length)<1e-8);assert(Math.abs(span.top-spans[i-1].bottom)<1e-8);}});
 }
 for(const variant of variants)for(const type of screenTypes){const config=createConfig(variant);const chart=renderFunnel(config.data,{...config.options,variant,texture:type});assert(ribbons(chart).every(path=>path.attrs.fill===`url(#atlas-${type})`));}
-for(const texture of ['mixed','sparse']){const old=createConfig('continuous');old.options.texture=texture;assert.equal(parseConfig(old).options.texture,'dense');}
+for(const variant of variants){const config=createConfig(variant);config.options.texture='mixed';assert.deepEqual(parseConfig(config),config);const fills=ribbons(renderFunnel(config.data,{...config.options,variant})).map(path=>path.attrs.fill);assert(new Set(fills).size>1);assert(fills.every(fill=>screenTypes.some(type=>fill===`url(#atlas-${type})`)));}
+const mixSwatch=screenSwatch('mixed');assert.equal(mixSwatch.children.filter(child=>child.tag==='rect').length,screenTypes.length+1);
+for(const texture of ['sparse','stipple','solid']){const old=createConfig('continuous');old.options.texture=texture;assert.equal(parseConfig(old).options.texture,'dense');}
 assert.deepEqual(screenTypes,['dense','am','hatch','cross','coarse']);
 console.log('Verified seeded samples and screens, full-figure stipple, independent dot count and gain, two-color fills, legacy migration, edge fades, vertical rim widths and heights, rounded vertical stages, config validation, and non-overlapping branching geometry across 384 samples, dense fan-outs, 100% flow conservation, and continuous node-to-node connections.');
