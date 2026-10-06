@@ -295,8 +295,11 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
         .atlas-vertical-hit { cursor: pointer; }
         [data-proximity-active="true"] { cursor: pointer; }
         .atlas-vertical-hit:focus { outline: none; }
-        [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus, [data-pointer-tracking="true"] .atlas-vertical-annotation { transition: none; }
-        @media (prefers-reduced-motion: reduce) { .atlas-vertical-stage, .atlas-vertical-focus, .atlas-vertical-annotation { transition: none; } }
+        [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity 150ms ease; }
+        @media (prefers-reduced-motion: reduce) {
+          .atlas-vertical-stage, .atlas-vertical-focus, .atlas-vertical-annotation,
+          [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: none; }
+        }
         [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-focus, [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none; }
       `}</style>}
       <StableScreenDefs idPrefix={idPrefix} width={model.width} height={model.height} density={normalized.density}
