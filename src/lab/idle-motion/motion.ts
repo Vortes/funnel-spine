@@ -6,7 +6,7 @@ const INK = '#2F4FE0';
 
 export type IdleMotionValues = {
   island: { enabled: boolean; lift: number; sideShift: number; cycle: number; stagger: number };
-  flow: { enabled: boolean; fallTime: number; dotRate: number; dotSize: number; dimInflow: boolean };
+  flow: { enabled: boolean; fallTime: number; dotRate: number; dotSize: number; dimInflowOnHover: boolean };
   hatch: { enabled: boolean; strokes: number; reach: number; weight: number; drawTime: number; hold: number; eraseTime: number; sideFace: boolean;
     directions: number; angleStep: number; jitter: number; mix: string; style: string; stippleDensity: number; stippleSize: number; halftoneDensity: number; halftoneDotSize: number };
 };
@@ -280,7 +280,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
         if (flowing) {
           gap.clip.setAttribute('y', String(apply(matrices[index], 0, gap.bottom).y));
           // Dim inflow ties each gap to the stage it leaves, so dots entering the inspected prism fade with the stack.
-          const opacity = m.flow.dimInflow ? opacities[index] : Math.max(opacities[index], opacities[index + 1]);
+          const opacity = m.flow.dimInflowOnHover ? opacities[index] : Math.max(opacities[index], opacities[index + 1]);
           gap.group.setAttribute('opacity', opacity.toFixed(3));
         }
         if (!m.flow.enabled || intensity < .5) { gap.carry = 0; return; }
@@ -339,7 +339,7 @@ export function useIdleMotionPanel(): RefObject<IdleMotionValues> {
       fallTime: [540, 120, 3000, 10],
       dotRate: [8, 0, 60, 1],
       dotSize: [1, 0.3, 3, 0.05],
-      dimInflow: false,
+      dimInflowOnHover: true,
     },
     hatch: {
       enabled: true,
