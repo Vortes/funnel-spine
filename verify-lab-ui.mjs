@@ -34,9 +34,9 @@ await waitFor(() => document.querySelectorAll('#canvas [data-key]').length === 5
 assert.match(document.querySelector('#figure-title').textContent, /Vertical funnel/);
 assert.equal(document.querySelectorAll('#canvas .atlas-vertical-stage [data-stage-face]').length, 10);
 await waitFor(() => document.querySelector('[aria-label="Playback Speed"]'), 'DialKit speed control');
-assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribute('aria-valuenow'), '1');
+assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribute('aria-valuenow'), '0.6');
 assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribute('aria-valuemin'), '0.1');
-assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-crossfade-duration'), '150ms');
+assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-crossfade-duration'), '250ms');
 assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-proximity-duration'), '240ms');
 assert.equal(document.querySelector('#canvas svg')?.getAttribute('data-vertical-transition'), 'crossfade');
 await waitFor(() => document.querySelector('#canvas [data-idle-flow] circle') && document.querySelector('#canvas [data-idle-hatch] circle')
