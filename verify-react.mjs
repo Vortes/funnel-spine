@@ -136,12 +136,13 @@ const movePointer = async (x, y, flush = true) => {
 };
 await movePointer(250, 140);
 assert.equal(inspected.at(-1), 'entry', 'inspection begins before the cursor reaches the stage');
-assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.64');
+assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.28');
 assert.equal(svg.getAttribute('data-proximity-active'), 'true');
-const halfScale = Number(document.querySelector('#app [data-stage-focus="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
+assert.equal(svg.getAttribute('data-proximity-transition'), 'true', 'initial hover has a timed transition');
+const initialScale = Number(document.querySelector('#app [data-stage-focus="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
 await movePointer(210, 140);
 const nearScale = Number(document.querySelector('#app [data-stage-focus="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
-assert(nearScale > halfScale, 'focus grows as the cursor approaches');
+assert.equal(nearScale, initialScale, 'the hover target does not change with cursor speed or distance');
 const incomingPosition = dom.window.getComputedStyle(document.querySelector('#app [data-stage="finish"]')).transform;
 const incomingOpacity = dom.window.getComputedStyle(document.querySelector('#app [data-stage="finish"]')).opacity;
 await movePointer(150, 330, false);
@@ -165,14 +166,15 @@ assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.op
   'a returning prism remains on one layer until its movement finishes');
 assert.equal(inspected.at(-1), null);
 assert.equal(svg.hasAttribute('data-proximity-active'), false);
+assert.equal(svg.getAttribute('data-proximity-transition'), 'true', 'hover exit has a timed transition');
 const returningFocus = document.querySelector('#app [data-stage-focus="finish"]');
 let stillMoving = true;
 returningFocus.getAnimations = () => stillMoving ? [{ playState: 'running', transitionProperty: 'transform' }] : [];
-await new Promise(resolve => setTimeout(resolve, 175));
-assert.equal(svg.hasAttribute('data-switching'), true, 'the handoff stays active while a prism is still moving');
+await new Promise(resolve => setTimeout(resolve, 265));
+assert.equal(svg.hasAttribute('data-proximity-transition'), true, 'the exit stays active while a prism is still moving');
 stillMoving = false;
 await new Promise(resolve => setTimeout(resolve, 40));
-assert.equal(svg.hasAttribute('data-switching'), false);
+assert.equal(svg.hasAttribute('data-proximity-transition'), false);
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1');
 assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '0');
 delete returningFocus.getAnimations;
@@ -186,7 +188,8 @@ await movePointer(250, 140);
 assert.equal(svg.hasAttribute('data-proximity-active'), false, 'the default radius does not reach a stage 50 px away');
 await movePointer(210, 140);
 assert.equal(svg.getAttribute('data-proximity-active'), 'true');
-assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.64', 'the default radius is 20 px');
+assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, '0', 'the default radius activates a single visible focus layer');
+assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '1');
 await movePointer(500, 140);
 await act(async () => root.render(createElement(AtlasFunnel, {
   data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65, proximityRadius: 0 },
@@ -223,7 +226,7 @@ await act(async () => root.render(createElement(AtlasFunnel, { ...transitionProp
 assert.equal(svg.getAttribute('data-vertical-transition'), 'none');
 assert.equal(document.querySelector('#app [data-stage="entry"]').style.transform, originalStageTransform);
 assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.transform, originalFocusTransform);
-assert.match(svg.querySelector('style').textContent, /\[data-vertical-transition="none"\].*opacity 0ms/);
+assert.match(svg.querySelector('style').textContent, /\[data-vertical-transition="none"\].*transition: none/);
 
 await act(async () => root.render(createElement('section', null,
   createElement(AtlasFunnel, { data: stages, options }),

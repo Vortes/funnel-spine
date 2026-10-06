@@ -35,6 +35,7 @@ await waitFor(() => document.querySelector('[aria-label="Playback Speed"]'), 'Di
 assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribute('aria-valuenow'), '1');
 assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribute('aria-valuemin'), '0.1');
 assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-crossfade-duration'), '150ms');
+assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-proximity-duration'), '240ms');
 assert.equal(document.querySelector('#canvas svg')?.getAttribute('data-vertical-transition'), 'crossfade');
 const createObjectURL = URL.createObjectURL, revokeObjectURL = URL.revokeObjectURL;
 const anchorClick = dom.window.HTMLAnchorElement.prototype.click;
@@ -50,6 +51,7 @@ assert.equal(exportedSvg.querySelectorAll('[data-hit-stage],[data-focus-outline]
 assert.equal(exportedSvg.querySelectorAll('[data-pointer-tracking]').length, 0);
 assert.equal(exportedSvg.querySelectorAll('[data-proximity-active]').length, 0);
 assert.equal(exportedSvg.querySelectorAll('[data-switching]').length, 0);
+assert.equal(exportedSvg.querySelectorAll('[data-proximity-transition]').length, 0);
 assert([...exportedSvg.querySelectorAll('.atlas-vertical-stage')].every(stage => !stage.style.transform && !stage.style.transformOrigin && !stage.style.opacity));
 assert(exportedSvg.querySelector('[data-stage-front="converted"]').getAttribute('fill').startsWith('url(#'));
 URL.createObjectURL = createObjectURL;

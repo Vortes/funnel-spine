@@ -68,6 +68,7 @@ function FunnelCanvas({ config, crossfadeDuration, verticalTransition, introToke
         ? <AtlasFunnel {...shared} key="continuous" data={config.data as readonly Stage[]} variant="continuous">{cover}</AtlasFunnel>
         : <AtlasFunnel {...shared} key="vertical" data={config.data as readonly Stage[]} variant="vertical"
           verticalTransition={verticalTransition} style={{ '--atlas-crossfade-duration': `${crossfadeDuration}ms`,
+            '--atlas-proximity-duration': `${crossfadeDuration * 1.6}ms`,
             '--atlas-overlap-delay': `${crossfadeDuration / 3}ms`, '--atlas-relay-duration': `${crossfadeDuration / 2}ms` } as CSSProperties} />)}
   </div>;
 }

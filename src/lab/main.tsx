@@ -171,6 +171,7 @@ function App() {
     clone.removeAttribute('data-pointer-tracking');
     clone.removeAttribute('data-proximity-active');
     clone.removeAttribute('data-switching');
+    clone.removeAttribute('data-proximity-transition');
     clone.querySelectorAll('.print-mark').forEach(mark => { mark.classList.remove('print-mark'); (mark as SVGElement).style.removeProperty('--print-step'); });
     clone.removeAttribute('xmlns');
     clone.setAttribute('width', clone.getAttribute('viewBox')!.split(' ')[2]);
