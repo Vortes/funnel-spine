@@ -9,7 +9,7 @@ export function setVerticalView(options,view){options.verticalViews[options.vert
 export function sampleData(variant,seed){
  let a=seed>>>0;const random=()=>{a+=0x6D2B79F5;let t=a;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};
  const total=10000+Math.round(random()*5000/100)*100;
- if(variant!=='branching'){let value=total;return ['Visitors','Engaged','Signups','Activated','Converted'].map((label,i)=>{if(i)value=Math.max(1,Math.round(value*(.35+random()*.4)));return{id:label.toLowerCase(),label,value};});}
+ if(variant!=='branching'){let value=total;return ['Visitors','Engaged','Signups','Activated','Converted'].map((label,i)=>{if(i)value=Math.max(1,Math.round(value*(.35+random()*.4)),variant==='vertical'?Math.round(total*[1,.3,.2,.14,.1][i]):0);return{id:label.toLowerCase(),label,value};});}
  const organic=Math.round(total*(.45+random()*.3)),paid=total-organic,orgSignup=Math.round(organic*(.18+random()*.25)),paidSignup=Math.round(paid*(.18+random()*.25));
  const active=Math.round((orgSignup+paidSignup)*(.4+random()*.35)),orgActive=Math.round(active*orgSignup/(orgSignup+paidSignup)),paidActive=active-orgActive;
  return {

@@ -19,6 +19,19 @@ const invalidParkedView=structuredClone(separateViews);invalidParkedView.options
 const importedView=structuredClone(vertical);importedView.options.verticalViews.isometric.stageGap=4;assert.equal(parseConfig(importedView).options.stageGap,4);
 const legacyViewSettings=structuredClone(separateViews);delete legacyViewSettings.options.verticalViews;const migratedViews=parseConfig(legacyViewSettings);assert.equal(migratedViews.options.verticalViews.flat.tailRatio,1);assert.equal(migratedViews.options.verticalViews.isometric.tailRatio,.15);assert.equal(migratedViews.options.verticalViews.isometric.stageGap,4);
 const presetRims=verticalRimGeometry(vertical.data,vertical.options);assert.equal(presetRims.radii[0],3);assert(presetRims.widths.every((width,i)=>!i||width<=presetRims.widths[i-1]));
+for(let seed=0;seed<1000;seed++){
+ const data=sampleData('vertical',seed),geometry=isometricStageGeometry(data,vertical.options);
+ assert(data.every((stage,i)=>!i||stage.value<data[i-1].value));
+ assert(data.at(-1).value/data[0].value>=.1-1/data[0].value,'seeded samples keep the final stage legible');
+ assert(geometry.every((stage,i)=>stage.bottom-stage.y>=25-1e-8),`seed ${seed} has a collapsed prism`);
+ assert(geometry.every((stage,i)=>stage.topWidth>=46-1e-8),`seed ${seed} has a narrow prism`);
+ assert(geometry.every((stage,i)=>Math.abs(stage.topWidth-460*data[i].value/data[0].value)<1e-8));
+ assert(geometry.every((stage,i)=>stage.bottomWidth<=stage.topWidth&&(i===geometry.length-1||stage.bottomWidth>=geometry[i+1].topWidth-1e-8)));
+}
+const steepStages=[10000,5000,100,10,1].map((value,i)=>({id:`steep-${i}`,label:`Stage ${i}`,value}));
+const steepGeometry=isometricStageGeometry(steepStages,vertical.options);
+assert(steepGeometry.every(stage=>stage.bottom-stage.y>=25-1e-8));
+assert(steepGeometry.every(stage=>!stage.front.includes('NaN')&&!stage.outline.includes('NaN')));
 const oldVertical=structuredClone(vertical);delete oldVertical.options.verticalView;delete oldVertical.options.verticalViews;oldVertical.options.stageGap=4;oldVertical.options.borderRadius=4;assert.equal(parseConfig(oldVertical).options.verticalView,'flat');
 const oldIsometric=structuredClone(vertical);oldIsometric.variant='isometric';delete oldIsometric.options.verticalView;const migratedIsometric=parseConfig(oldIsometric);assert.equal(migratedIsometric.variant,'vertical');assert.equal(migratedIsometric.options.verticalView,'isometric');
 const invalidView=structuredClone(vertical);invalidView.options.verticalView='sideways';assert.throws(()=>parseConfig(invalidView),/vertical view/);

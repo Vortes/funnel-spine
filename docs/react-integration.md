@@ -55,6 +55,8 @@ import type { Stage } from 'funnel-spine';
 />
 ```
 
+In the isometric Vertical view, front widths remain proportional to quantities. When stage losses are uneven, the layout redistributes vertical space so small losses still have a visible front face; it does not change the supplied data.
+
 ## Interaction
 
 `onInspect(info)` fires as the mouse approaches a Vertical stage, on hover for other variants, and on keyboard focus. `onInspect(null)` fires when that inspection ends. The inspection includes `key`, `kind`, `label`, `value`, `denominator`, and `total`; branching links also include `source` and `target`. Conversion is `value / denominator`, and share of total is `value / total`. Zero denominators have no defined percentage. In Vertical, `options.proximityRadius` controls the mouse sensing distance in screen pixels (0–240, default 20; 0 requires the cursor to be inside a stage). The cursor becomes a pointer inside that range. The sensor triggers a timed expansion or return when the cursor enters or leaves that range; moving faster or farther within it does not change the animation speed. Their original screen fills remain visible.

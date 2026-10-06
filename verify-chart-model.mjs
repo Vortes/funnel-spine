@@ -39,6 +39,10 @@ assert.equal(paths(iso).length, 3);
 assert.equal(iso.marks.filter(mark => mark.type === 'path' && mark.face).length, 6);
 assert.equal(iso.clips.length, 3);
 assert.throws(() => buildChartModel(stages, 'vertical', { verticalView: 'isometric', tailRatio: 1, stageGap: 20 }), /terminal taper/);
+const steep = [10000, 5000, 100, 10, 1].map((value, i) => ({ id: String(i), label: `Stage ${i}`, value }));
+const steepIso = buildChartModel(steep, 'vertical', { verticalView: 'isometric', stageHeight: 330, stageGap: 20, tailRatio: .15 });
+assert.equal(paths(steepIso).length, steep.length);
+assert(steepIso.marks.every(mark => mark.type !== 'path' || !/NaN|Infinity/.test(mark.d)));
 
 const graph = {
   nodes: [

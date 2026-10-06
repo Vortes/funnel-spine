@@ -60,11 +60,25 @@ export function isometricStageGeometry(data,{stageHeight=310,stageGap=20,tailRat
  const {widths:linearWidths}=verticalRimGeometry(data,{stageHeight,stageGap,tailRatio}),widths=linearWidths.map(width=>width*Math.cos(angle)/baseline);
  if(widths.some((width,i)=>i&&width>=widths[i-1]))throw new Error('Isometric stages need decreasing quantities and a terminal taper below 100%.');
  const center=360+Math.max(0,60-(360-widths[0]/2+Math.min(0,dx))),topY=Math.max(70,rise+20);
- const scale=stageHeight/(widths[0]-widths.at(-1));
- const rimY=widths.map(width=>topY+(widths[0]-width)*scale);
+ const count=data.length,maxGap=Math.min(stageGap,stageHeight/count*.35);
+ const minFront=Math.min(25,(stageHeight-(count-1)*maxGap)/count*.75);
+ const minimums=data.map((_,i)=>minFront+(i<count-1?maxGap:0));
+ const totalTaper=widths[0]-widths.at(-1);
+ const natural=data.map((_,i)=>stageHeight*(widths[i]-widths[i+1])/totalTaper);
+ let scale=1;
+ if(natural.some((interval,i)=>interval<minimums[i])){
+  let low=0,high=1;
+  for(let i=0;i<48;i++){
+   const middle=(low+high)/2;
+   const total=natural.reduce((sum,interval,index)=>sum+Math.max(minimums[index],interval*middle),0);
+   if(total>stageHeight)high=middle;else low=middle;
+  }
+  scale=(low+high)/2;
+ }
+ const rimY=[topY];natural.forEach((interval,i)=>rimY.push(rimY[i]+Math.max(minimums[i],interval*scale)));
  return data.map((stage,i)=>{
-  const y=rimY[i],nextY=rimY[i+1],gap=i<data.length-1?Math.min(stageGap,(nextY-y)*.65):0,bottom=nextY-gap;
-  const bottomWidth=widths[0]-(bottom-topY)/scale,left=center-widths[i]/2,right=center+widths[i]/2,leftBottom=center-bottomWidth/2,rightBottom=center+bottomWidth/2;
+  const y=rimY[i],nextY=rimY[i+1],interval=nextY-y,gap=i<data.length-1?Math.min(maxGap,interval*.45):0,bottom=nextY-gap;
+  const bottomWidth=widths[i]+(widths[i+1]-widths[i])*(1-gap/interval),left=center-widths[i]/2,right=center+widths[i]/2,leftBottom=center-bottomWidth/2,rightBottom=center+bottomWidth/2;
   const outline=dx>=0?[
    {x:left,y},{x:left+dx,y:y-rise},{x:right+dx,y:y-rise},{x:rightBottom+dx,y:bottom-rise},{x:rightBottom,y:bottom},{x:leftBottom,y:bottom}
   ]:[
