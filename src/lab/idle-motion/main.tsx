@@ -15,7 +15,7 @@ type Motion = {
   island: { enabled: boolean; lift: number; sideShift: number; cycle: number; stagger: number };
   flow: { enabled: boolean; fallTime: number; dotRate: number; dotSize: number };
   hatch: { enabled: boolean; strokes: number; reach: number; weight: number; drawTime: number; hold: number; eraseTime: number; sideFace: boolean;
-    directions: number; angleStep: number; jitter: number; mix: string; matchScreen: boolean; stippleDensity: number; stippleSize: number };
+    directions: number; angleStep: number; jitter: number; mix: string; style: string; stippleDensity: number; stippleSize: number; halftoneDensity: number };
   yieldToHover: boolean;
 };
 type Point = { x: number; y: number };
@@ -109,6 +109,8 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
       return { type: id.slice(id.lastIndexOf('-') + 1), size: Number(pattern?.getAttribute('width') ?? 3),
         radius: Number(pattern?.querySelector('circle')?.getAttribute('r') ?? 0) };
     };
+    const halftone = screenOf(svg.querySelector('[fill$="-am)"]'));
+    const halftoneSize = halftone.type === 'am' ? halftone.size : 3;
     const corners: Corner[] = stages.map((stage, index) => {
       const frontFace = stage.querySelector(`[data-stage-front="${data[index].id}"]`), sideFace = stage.querySelector('[data-face="side"]');
       const front = points(frontFace?.getAttribute('d') ?? null), side = points(sideFace?.getAttribute('d') ?? null);
@@ -139,11 +141,18 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
         const polygon = inside(target.front, p) ? target.front : h.sideFace && inside(target.side, p) ? target.side : null;
         if (!polygon) continue;
         const closeness = 1 - distance / reach, screen = polygon === target.front ? target.frontScreen : target.sideScreen;
-        if (h.matchScreen && isStipple(screen)) {
+        if (h.style === 'halftone' && !isGrid(screen)) {
+          // Halftone style inks new dots on the AM grid, growing toward the corner like a halftone gradient.
+          const size = halftoneSize, at = { x: (Math.floor(p.x / size) + .5) * size, y: (Math.floor(p.y / size) + .5) * size };
+          if (!inside(polygon, at)) continue;
+          addDot(cornerIndex, now, h, at, 0, size * .52 * (.3 + .7 * closeness));
+          return;
+        }
+        if (h.style === 'match' && isStipple(screen)) {
           addDot(cornerIndex, now, h, p, 0, h.stippleSize * (.75 + rand() * .5));
           return;
         }
-        if (h.matchScreen && isGrid(screen)) {
+        if (h.style !== 'lines' && isGrid(screen)) {
           const { size, radius } = screen;
           if (radius < size * .45) {
             // Open halftone: swell the real grid dot toward touching its neighbours.
@@ -158,7 +167,7 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
           }
           return;
         }
-        const hatchDirection = strokeDirection(h, closeness, h.matchScreen && screen.type === 'cross');
+        const hatchDirection = strokeDirection(h, closeness, h.style === 'match' && screen.type === 'cross');
         const [low, high] = chord(polygon, p, hatchDirection);
         const length = Math.min(high - low, 2 + (reach * .8) * closeness * (.5 + rand() * .5));
         const start = Math.max(low + .4, Math.min(-length / 2, high - .4 - length)), end = Math.min(high - .4, start + length);
@@ -204,7 +213,8 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
       corners.forEach((corner, index) => {
         corner.group.setAttribute('opacity', Math.min(1, intensity * 1.5).toFixed(3));
         if (!hatch.enabled || intensity < .5) { corner.carry = 0; return; }
-        const density = hatch.matchScreen && isStipple(corner.frontScreen) ? hatch.stippleDensity : 1;
+        const density = hatch.style === 'halftone' ? hatch.halftoneDensity
+          : hatch.style === 'match' && isStipple(corner.frontScreen) ? hatch.stippleDensity : 1;
         const wanted = hatch.strokes * corner.scale * density, live = marks.filter(mark => mark.corner === index).length;
         corner.carry += wanted / (life / 1000) * dt;
         while (corner.carry >= 1) { corner.carry -= 1; if (live < wanted * 1.3) spawnMark(index, now, hatch); }
@@ -292,7 +302,12 @@ function IdleMotion() {
         { value: 'layered', label: 'Layered' },
         { value: 'mixed', label: 'Mixed' },
       ], default: 'layered' },
-      matchScreen: true,
+      style: { type: 'select', options: [
+        { value: 'halftone', label: 'Halftone' },
+        { value: 'match', label: 'Match screen' },
+        { value: 'lines', label: 'Lines' },
+      ], default: 'halftone' },
+      halftoneDensity: [2.5, 1, 8, 0.5],
       stippleDensity: [4, 1, 12, 0.5],
       stippleSize: [0.45, 0.2, 1.5, 0.05],
     },
