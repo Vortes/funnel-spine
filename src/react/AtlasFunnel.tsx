@@ -191,7 +191,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
       role="group" aria-label={`${variant} conversion funnel`} style={{ display: 'block', height: 'auto', minWidth: model.width > 900 ? model.width : undefined }}
       onPointerUp={verticalData ? event => { if (event.pointerType !== 'mouse' && !(event.target as Element).closest('[data-hit-stage]')) clearPinned(); } : undefined}>
       {verticalData && <style>{`
-        .atlas-vertical-stage { transform-box: fill-box; transform-origin: center; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
+        .atlas-vertical-stage { transform-box: view-box; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
         .atlas-vertical-annotation { transition: opacity 150ms ease; }
         .atlas-vertical-hit { cursor: pointer; }
         .atlas-vertical-hit:focus { outline: none; }
@@ -209,10 +209,11 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
           const displaced = selectedIndex >= 0 && !selected;
           const ratio = stage.value / (verticalData[0]?.value || 1);
           const scale = 1.06 + .36 * (1 - ratio);
-          const transform = selected ? `translate(${12 + 12 * (1 - ratio)}px, 0px) scale(${scale})`
-            : displaced ? `translate(-18px, ${index < selectedIndex ? -22 : 22}px) scale(.98)` : 'none';
+          const transform = selected ? `scale(${scale})`
+            : displaced ? `translateY(${index < selectedIndex ? -22 : 22}px) scale(.98)` : 'none';
           return <g key={stage.id} className="atlas-vertical-stage" data-stage={stage.id}
-            data-active={selected || undefined} style={{ transform, opacity: displaced ? .28 : 1 }}>
+            data-active={selected || undefined} style={{ transform, transformOrigin: front?.type === 'path' && front.focus
+              ? `${front.focus.x}px ${front.focus.y}px` : undefined, opacity: displaced ? .28 : 1 }}>
             {marks.map(mark => <Mark key={mark.key} mark={mark} idPrefix={idPrefix}
               activeKey={activeKey} visibleKeys={null} roughness={normalized.roughness ?? .15}
               onPreview={preview} onLeave={leave} verticalStage />)}

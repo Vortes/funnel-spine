@@ -23,6 +23,7 @@ export type PathMark = MarkBase & {
   strokeWidth?: number; lineJoin?: 'round'; inspection?: Inspection;
   clipId?: string; maskSide?: 'left' | 'right' | 'both';
   face?: 'side' | 'top'; stageId?: string; outline?: boolean;
+  focus?: { x: number; y: number };
 };
 export type LineMark = MarkBase & {
   type: 'line'; x1: number; y1: number; x2: number; y2: number;

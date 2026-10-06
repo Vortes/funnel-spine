@@ -11,6 +11,8 @@ export declare function verticalContainerGeometry(data: readonly Stage[], option
     width: number;
     lowerWidth: number;
     radius: number;
+    centerX: number;
+    centerY: number;
     topLeft: number;
     topRight: number;
     bottomLeft: number;
@@ -24,6 +26,8 @@ export declare function isometricStageGeometry(data: readonly Stage[], { stageHe
     outerRight: number;
     topWidth: number;
     bottomWidth: number;
+    centerX: number;
+    centerY: number;
     outline: string;
     front: string;
     top: string;

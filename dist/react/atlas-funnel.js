@@ -432,7 +432,21 @@ function verticalContainerGeometry(data, options, index) {
   const bl = intersection(base.q, tangent(c, bottomControl, d, 1 - v), leftStart, leftVector, d);
   const tl = intersection(leftEnd, leftVector, top.p, tangent(a, topControl, b, u), a);
   const path = `M ${point(top.p)} Q ${point(top.control)} ${point(top.q)} Q ${point(tr)} ${point(rightStart)} L ${point(rightEnd)} Q ${point(br)} ${point(base.p)} Q ${point(base.control)} ${point(base.q)} Q ${point(bl)} ${point(leftStart)} L ${point(leftEnd)} Q ${point(tl)} ${point(top.p)} Z`;
-  return { path, y, bottom, height: bottom - y, width, lowerWidth, radius, topLeft: top.p.x, topRight: top.q.x, bottomLeft: base.q.x, bottomRight: base.p.x };
+  return {
+    path,
+    y,
+    bottom,
+    height: bottom - y,
+    width,
+    lowerWidth,
+    radius,
+    centerX: center,
+    centerY: (y + bottom) / 2,
+    topLeft: top.p.x,
+    topRight: top.q.x,
+    bottomLeft: base.q.x,
+    bottomRight: base.p.x
+  };
 }
 function roundedPolygonPath(points, radius) {
   if (!radius) return `M ${points.map((p) => `${p.x} ${p.y}`).join(" L ")} Z`;
@@ -480,6 +494,8 @@ function isometricStageGeometry(data, { stageHeight = 310, stageGap = 20, tailRa
       outerRight: right + Math.max(0, dx),
       topWidth: widths[i],
       bottomWidth,
+      centerX: center + dx / 2,
+      centerY: (y + bottom - rise) / 2,
       outline: roundedPolygonPath(outlinePoints, borderRadius),
       front: `M ${left} ${y} L ${right} ${y} L ${rightBottom} ${bottom} L ${leftBottom} ${bottom} Z`,
       top: `M ${left} ${y} L ${left + dx} ${y - rise} L ${right + dx} ${y - rise} L ${right} ${y} Z`,
@@ -519,7 +535,17 @@ function verticalModel(stageData, options = {}) {
     stages.forEach((stage, i) => {
       const s = stageData[i], clipId = borderRadius ? `stage-clip-${i}` : void 0;
       const inspection = { key: s.id, label: s.label, value: s.value, denominator: stageData[i - 1]?.value ?? max, total: max, kind: "stage" };
-      marks.push({ type: "path", key: s.id, d: stage.front, pattern: chooseScreen(i), stroke: true, strokeWidth: sw, clipId, inspection });
+      marks.push({
+        type: "path",
+        key: s.id,
+        d: stage.front,
+        pattern: chooseScreen(i),
+        stroke: true,
+        strokeWidth: sw,
+        clipId,
+        inspection,
+        focus: { x: stage.centerX, y: stage.centerY }
+      });
       if (borderRadius) marks.push({ type: "path", key: `stage:${s.id}:outline`, d: stage.outline, fill: "none", stroke: true, strokeWidth: sw, lineJoin: "round", outline: true, stageId: s.id });
     });
     if (labels) stages.forEach((stage, i) => {
@@ -534,7 +560,16 @@ function verticalModel(stageData, options = {}) {
   stageData.forEach((s, i) => {
     const geometry = verticalContainerGeometry(stageData, { stageHeight, stageGap, tailRatio, capCurve, borderRadius }, i);
     const inspection = { key: s.id, label: s.label, value: s.value, denominator: stageData[i - 1]?.value ?? max, total: max, kind: "stage" };
-    marks.push({ type: "path", key: s.id, d: geometry.path, pattern: chooseScreen(i), stroke: true, strokeWidth: sw, inspection });
+    marks.push({
+      type: "path",
+      key: s.id,
+      d: geometry.path,
+      pattern: chooseScreen(i),
+      stroke: true,
+      strokeWidth: sw,
+      inspection,
+      focus: { x: geometry.centerX, y: geometry.centerY }
+    });
     if (labels) {
       const mid = geometry.y + stageHeight / stageData.length / 2;
       addText(`stage:${s.id}:number`, 52, mid, String(i + 1).padStart(2, "0"), 12);
@@ -1024,7 +1059,7 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
       } : void 0,
       children: [
         verticalData && /* @__PURE__ */ jsx2("style", { children: `
-        .atlas-vertical-stage { transform-box: fill-box; transform-origin: center; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
+        .atlas-vertical-stage { transform-box: view-box; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
         .atlas-vertical-annotation { transition: opacity 150ms ease; }
         .atlas-vertical-hit { cursor: pointer; }
         .atlas-vertical-hit:focus { outline: none; }
@@ -1054,14 +1089,14 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
             const displaced = selectedIndex >= 0 && !selected;
             const ratio = stage.value / (verticalData[0]?.value || 1);
             const scale = 1.06 + 0.36 * (1 - ratio);
-            const transform = selected ? `translate(${12 + 12 * (1 - ratio)}px, 0px) scale(${scale})` : displaced ? `translate(-18px, ${index < selectedIndex ? -22 : 22}px) scale(.98)` : "none";
+            const transform = selected ? `scale(${scale})` : displaced ? `translateY(${index < selectedIndex ? -22 : 22}px) scale(.98)` : "none";
             return /* @__PURE__ */ jsxs2(
               "g",
               {
                 className: "atlas-vertical-stage",
                 "data-stage": stage.id,
                 "data-active": selected || void 0,
-                style: { transform, opacity: displaced ? 0.28 : 1 },
+                style: { transform, transformOrigin: front?.type === "path" && front.focus ? `${front.focus.x}px ${front.focus.y}px` : void 0, opacity: displaced ? 0.28 : 1 },
                 children: [
                   marks.map((mark) => /* @__PURE__ */ jsx2(
                     Mark,

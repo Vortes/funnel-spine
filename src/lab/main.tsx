@@ -151,6 +151,7 @@ function App() {
     clone.querySelectorAll('[data-focus-outline]').forEach(path => path.remove());
     clone.querySelectorAll<SVGElement>('.atlas-vertical-stage,.atlas-vertical-annotation').forEach(group => {
       group.style.removeProperty('transform');
+      group.style.removeProperty('transform-origin');
       group.style.removeProperty('opacity');
       group.removeAttribute('data-active');
     });

@@ -69,6 +69,10 @@ export type PathMark = MarkBase & {
     face?: 'side' | 'top';
     stageId?: string;
     outline?: boolean;
+    focus?: {
+        x: number;
+        y: number;
+    };
 };
 export type LineMark = MarkBase & {
     type: 'line';

@@ -39,7 +39,8 @@ export function verticalContainerGeometry(data: readonly Stage[], options: Requi
   const bl = intersection(base.q, tangent(c, bottomControl, d, 1 - v), leftStart, leftVector, d);
   const tl = intersection(leftEnd, leftVector, top.p, tangent(a, topControl, b, u), a);
   const path = `M ${point(top.p)} Q ${point(top.control)} ${point(top.q)} Q ${point(tr)} ${point(rightStart)} L ${point(rightEnd)} Q ${point(br)} ${point(base.p)} Q ${point(base.control)} ${point(base.q)} Q ${point(bl)} ${point(leftStart)} L ${point(leftEnd)} Q ${point(tl)} ${point(top.p)} Z`;
-  return { path, y, bottom, height: bottom - y, width, lowerWidth, radius, topLeft: top.p.x, topRight: top.q.x, bottomLeft: base.q.x, bottomRight: base.p.x };
+  return { path, y, bottom, height: bottom - y, width, lowerWidth, radius, centerX: center, centerY: (y + bottom) / 2,
+    topLeft: top.p.x, topRight: top.q.x, bottomLeft: base.q.x, bottomRight: base.p.x };
 }
 
 type Point = { x: number; y: number };
@@ -76,6 +77,7 @@ export function isometricStageGeometry(data: readonly Stage[], { stageHeight = 3
     ];
     return {
       key: stage.id, y, bottom, right, outerRight: right + Math.max(0, dx), topWidth: widths[i], bottomWidth,
+      centerX: center + dx / 2, centerY: (y + bottom - rise) / 2,
       outline: roundedPolygonPath(outlinePoints, borderRadius),
       front: `M ${left} ${y} L ${right} ${y} L ${rightBottom} ${bottom} L ${leftBottom} ${bottom} Z`,
       top: `M ${left} ${y} L ${left + dx} ${y - rise} L ${right + dx} ${y - rise} L ${right} ${y} Z`,
@@ -106,7 +108,8 @@ export function verticalModel(stageData: readonly Stage[], options: ChartOptions
     stages.forEach((stage, i) => {
       const s = stageData[i], clipId = borderRadius ? `stage-clip-${i}` : undefined;
       const inspection: Inspection = { key: s.id, label: s.label, value: s.value, denominator: stageData[i - 1]?.value ?? max, total: max, kind: 'stage' };
-      marks.push({ type: 'path', key: s.id, d: stage.front, pattern: chooseScreen(i), stroke: true, strokeWidth: sw, clipId, inspection });
+      marks.push({ type: 'path', key: s.id, d: stage.front, pattern: chooseScreen(i), stroke: true, strokeWidth: sw, clipId, inspection,
+        focus: { x: stage.centerX, y: stage.centerY } });
       if (borderRadius) marks.push({ type: 'path', key: `stage:${s.id}:outline`, d: stage.outline, fill: 'none', stroke: true, strokeWidth: sw, lineJoin: 'round', outline: true, stageId: s.id });
     });
     if (labels) stages.forEach((stage, i) => {
@@ -121,7 +124,8 @@ export function verticalModel(stageData: readonly Stage[], options: ChartOptions
   stageData.forEach((s, i) => {
     const geometry = verticalContainerGeometry(stageData, { stageHeight, stageGap, tailRatio, capCurve, borderRadius }, i);
     const inspection: Inspection = { key: s.id, label: s.label, value: s.value, denominator: stageData[i - 1]?.value ?? max, total: max, kind: 'stage' };
-    marks.push({ type: 'path', key: s.id, d: geometry.path, pattern: chooseScreen(i), stroke: true, strokeWidth: sw, inspection });
+    marks.push({ type: 'path', key: s.id, d: geometry.path, pattern: chooseScreen(i), stroke: true, strokeWidth: sw, inspection,
+      focus: { x: geometry.centerX, y: geometry.centerY } });
     if (labels) {
       const mid = geometry.y + stageHeight / stageData.length / 2;
       addText(`stage:${s.id}:number`, 52, mid, String(i + 1).padStart(2, '0'), 12);

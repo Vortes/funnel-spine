@@ -103,6 +103,9 @@ assert.equal(faces.length, 4);
 assert(faces.every(face => face.getAttribute('fill') === face.getAttribute('data-base-fill')));
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.28');
 assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, '1');
+assert.match(document.querySelector('#app [data-stage="entry"]').style.transform, /^scale\(/);
+assert.match(document.querySelector('#app [data-stage="entry"]').style.transformOrigin, /^\d+(?:\.\d+)?px \d+(?:\.\d+)?px$/);
+assert.equal(document.querySelector('#app [data-stage="finish"]').style.transform, 'translateY(22px) scale(.98)');
 assert.equal(document.querySelector('#app [data-stage-front="finish"]').getAttribute('fill'),
   document.querySelector('#app [data-stage-front="finish"]').getAttribute('data-base-fill'));
 assert.equal(document.querySelector('#app [data-stage="entry"]'),
