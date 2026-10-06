@@ -11,11 +11,13 @@ export type IdleMotionValues = {
     directions: number; angleStep: number; jitter: number; mix: string; style: string; stippleDensity: number; stippleSize: number; halftoneDensity: number; halftoneDotSize: number };
 };
 type Point = { x: number; y: number };
+type Matrix = { a: number; b: number; c: number; d: number; e: number; f: number };
 type Gap = { group: SVGGElement; clip: SVGRectElement; bottom: number; x0: number; x1: number; depth: Point; landFront: number; rate: number; carry: number };
 type Screen = { type: string; size: number; radius: number };
 type Corner = { group: SVGGElement; corner: Point; front: Point[]; side: Point[]; frontScreen: Screen; sideScreen: Screen; scale: number; carry: number };
 // Lines draw along their length; dots swell from one radius to another.
 type HandMark = { node: SVGElement; kind: 'line' | 'dot'; corner: number; born: number; draw: number; hold: number; erase: number; from: number; to: number };
+// Dot coordinates are local to the stages: x and from in the source stage, x and to in the target stage.
 type Dot = { node: SVGCircleElement; gap: number; x: number; from: number; to: number; born: number; fall: number };
 
 const points = (d: string | null) => {
@@ -56,7 +58,7 @@ let instances = 0;
 
 /** Removes every node and style the idle motion adds, for exporting a still figure. */
 export function stripIdleMotion(svg: SVGSVGElement) {
-  svg.querySelectorAll('[data-idle-flow],[data-idle-hatch],[data-idle-clip],[data-idle-mirror]').forEach(node => node.remove());
+  svg.querySelectorAll('[data-idle-flow-layer],[data-idle-hatch],[data-idle-clip],[data-idle-mirror]').forEach(node => node.remove());
   svg.querySelectorAll<SVGElement>('.atlas-vertical-stage').forEach(stage => stage.style.removeProperty('translate'));
 }
 
@@ -72,6 +74,14 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
     const defs = svg.querySelector('defs') ?? svg.insertBefore(document.createElementNS(SVG, 'defs'), svg.firstChild);
     const instance = ++instances;
     const rand = random(scene.seed);
+    // Falling dots live in one layer above every stage, so no stage's hover dimming applies to them. Each frame they
+    // are placed through the on-screen transform of the stage they leave and the stage they land on.
+    const focusGroups = stages.map((_, index) => svg.querySelector<SVGGElement>(`.atlas-vertical-focus[data-stage-index="${index}"]`));
+    const flowLayer = document.createElementNS(SVG, 'g');
+    flowLayer.dataset.idleFlowLayer = '';
+    flowLayer.setAttribute('pointer-events', 'none');
+    const above = focusGroups.filter(Boolean).at(-1) ?? stages.at(-1)!;
+    above.parentNode!.insertBefore(flowLayer, above.nextSibling);
     const gaps: Gap[] = stages.slice(0, -1).map((source, index) => {
       const target = stages[index + 1];
       const front = points(source.querySelector(`[data-stage-front="${data[index].id}"]`)?.getAttribute('d') ?? null);
@@ -88,8 +98,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
       group.setAttribute('clip-path', `url(#${clipPath.id})`);
       group.setAttribute('pointer-events', 'none');
       group.dataset.idleFlow = String(index);
-      group.id = `idle-${instance}-flow-${index}`;
-      target.append(group);
+      flowLayer.append(group);
       return {
         group, clip, bottom: front[2].y, depth: { x: backLeft.x - frontLeft.x, y: backLeft.y - frontLeft.y },
         x0: Math.max(front[3].x, frontLeft.x) + 3, x1: Math.min(front[2].x, frontRight.x) - 3,
@@ -199,8 +208,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
     let intensity = 1, last = performance.now(), clock = 0, frame = 0;
 
     // Motion keeps playing while a stage is inspected. Hover hides the inspected stage and shows an enlarged copy,
-    // so the copy floats with its stage and mirrors the live marks and landing dots through <use> references.
-    const focusGroups = stages.map((_, index) => svg.querySelector<SVGGElement>(`.atlas-vertical-focus[data-stage-index="${index}"]`));
+    // so the copy floats with its stage and mirrors the live corner marks through a <use> reference.
     const mirror = (focus: SVGGElement | null, id: string, before: Element | null) => {
       if (!focus) return;
       const use = document.createElementNS(SVG, 'use');
@@ -210,13 +218,16 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
     };
     focusGroups.forEach((focus, index) => {
       mirror(focus, `idle-${instance}-hatch-${index}`, focus?.querySelector('[data-stage-outline]') ?? null);
-      if (index > 0) mirror(focus, `idle-${instance}-flow-${index - 1}`, null);
     });
-    // Hover pushes neighbouring stages apart with a translateY transform; dots and gap clips follow that offset too.
-    const hoverShift = (group: SVGGElement) => {
-      const values = /matrix\(([^)]+)\)/.exec(window.getComputedStyle(group).transform)?.[1].split(',').map(Number);
-      return values?.[5] ?? 0;
+    // The inspected stage is drawn by its enlarged focus copy; every other stage by its own group.
+    const shown = (index: number) => focusGroups[index]?.hasAttribute('data-visible') ? focusGroups[index]! : stages[index];
+    const matrixOf = (element: SVGGraphicsElement, offset: Point): Matrix => {
+      const root = svg.getScreenCTM?.(), own = element.getScreenCTM?.();
+      if (!root || !own) return { a: 1, b: 0, c: 0, d: 1, e: offset.x, f: offset.y };
+      const { a, b, c, d, e, f } = root.inverse().multiply(own);
+      return { a, b, c, d, e, f };
     };
+    const apply = (m: Matrix, x: number, y: number) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f });
 
     const tick = (now: number) => {
       const dt = Math.min(.05, (now - last) / 1000);
@@ -238,7 +249,10 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
         group.style.translate = translate;
         if (focusGroups[index]) focusGroups[index]!.style.translate = translate;
       });
-      const shifts = gaps.length && m.flow.enabled ? stages.map(hoverShift) : stages.map(() => 0);
+      const flowing = gaps.length > 0 && (m.flow.enabled || dots.length > 0);
+      const placed = flowing ? stages.map((_, index) => shown(index)) : [];
+      const matrices = placed.map((element, index) => matrixOf(element, offsets[index]));
+      const opacities = placed.map(element => Number(window.getComputedStyle(element).opacity || 1));
       const hatch = m.hatch, life = hatch.drawTime + hatch.hold * 1000 + hatch.eraseTime;
       corners.forEach((corner, index) => {
         corner.group.setAttribute('opacity', Math.min(1, intensity * 1.5).toFixed(3));
@@ -263,8 +277,10 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
         }
       }
       gaps.forEach((gap, index) => {
-        const relative = offsets[index].y + shifts[index] - offsets[index + 1].y - shifts[index + 1];
-        gap.clip.setAttribute('y', String(gap.bottom + relative));
+        if (flowing) {
+          gap.clip.setAttribute('y', String(apply(matrices[index], 0, gap.bottom).y));
+          gap.group.setAttribute('opacity', Math.max(opacities[index], opacities[index + 1]).toFixed(3));
+        }
         if (!m.flow.enabled || intensity < .5) { gap.carry = 0; return; }
         gap.carry += m.flow.dotRate * gap.rate * dt;
         while (gap.carry >= 1) {
@@ -273,7 +289,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
           const node = document.createElementNS(SVG, 'circle');
           node.setAttribute('fill', INK);
           gap.group.append(node);
-          dots.push({ node, gap: index, x: across + gap.depth.x * depth, from: gap.bottom + relative + gap.depth.y * depth,
+          dots.push({ node, gap: index, x: across + gap.depth.x * depth, from: gap.bottom + gap.depth.y * depth,
             to: gap.landFront + gap.depth.y * depth, born: now, fall: m.flow.fallTime });
         }
       });
@@ -282,9 +298,10 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
         const progress = Math.min(1, age / dot.fall);
         const opacity = age < dot.fall ? 1 : 1 - (age - dot.fall) / fade;
         if (opacity <= 0 || (intensity < .02 && !m.flow.enabled)) { dot.node.remove(); dots.splice(index, 1); continue; }
-        dot.node.setAttribute('cx', dot.x.toFixed(2));
-        dot.node.setAttribute('cy', (dot.from + (dot.to - dot.from) * progress * progress).toFixed(2));
-        dot.node.setAttribute('r', String(m.flow.dotSize));
+        const start = apply(matrices[dot.gap], dot.x, dot.from), end = apply(matrices[dot.gap + 1], dot.x, dot.to);
+        dot.node.setAttribute('cx', (start.x + (end.x - start.x) * progress).toFixed(2));
+        dot.node.setAttribute('cy', (start.y + (end.y - start.y) * progress * progress).toFixed(2));
+        dot.node.setAttribute('r', (m.flow.dotSize * matrices[dot.gap + 1].a).toFixed(3));
         dot.node.setAttribute('opacity', (opacity * Math.min(1, intensity * 1.5)).toFixed(3));
       }
       frame = requestAnimationFrame(tick);
@@ -299,7 +316,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
       focusGroups.forEach(focus => { if (focus) focus.style.translate = ''; });
       svg.querySelectorAll(`[data-idle-mirror]`).forEach(use => { if (use.getAttribute('href')?.startsWith(`#idle-${instance}-`)) use.remove(); });
       corners.forEach(corner => corner.group.remove());
-      gaps.forEach(gap => gap.group.remove());
+      flowLayer.remove();
       defs.querySelectorAll(`[id^="idle-${instance}-gap-"]`).forEach(node => node.remove());
     };
   }, [root, motion, scene]);
