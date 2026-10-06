@@ -73,4 +73,32 @@ assert.throws(() => buildChartModel({ ...graph, links: graph.links.slice(1) }, '
 assert.deepEqual(stages, stageSnapshot);
 assert.deepEqual(graph, graphSnapshot);
 
-console.log('Verified pure chart models for continuous, flat and isometric vertical, and connected branching flows.');
+// Isometric Vertical figures are a parallel (oblique) projection: every depth edge shares one direction and every
+// side face is a parallelogram. The default preset's stages are slices of one tapered solid with a single apex.
+{
+  globalThis.HTMLElement ??= class {};
+  const { createConfig, sampleData } = await import('./dist/lab/config.js');
+  const preset = createConfig('vertical');
+  const corners = d => { const n = d.match(/-?\d+(?:\.\d+)?(?:e-?\d+)?/g).map(Number); return Array.from({ length: n.length / 2 }, (_, i) => ({ x: n[2 * i], y: n[2 * i + 1] })); };
+  const faces = (model, id) => Object.fromEntries(['front', 'top', 'side'].map(face => [face,
+    corners(model.marks.find(mark => mark.key === (face === 'front' ? id : `stage:${id}:${face}`)).d)]));
+  const near = (a, b, label) => assert(Math.abs(a - b) < 1e-6, `${label}: ${a} vs ${b}`);
+  for (const data of [preset.data, ...[0, 1, 7, 99, 1234].map(seed => sampleData('vertical', seed))]) {
+    const model = buildChartModel(data, 'vertical', preset.options);
+    const depth = faces(model, data[0].id).top;
+    for (const stage of data) {
+      const { front: [tl, tr, br], top, side } = faces(model, stage.id);
+      near(top[1].x - top[0].x, depth[1].x - depth[0].x, 'top depth x'); near(top[1].y - top[0].y, depth[1].y - depth[0].y, 'top depth y');
+      near(side[1].x - side[0].x, depth[1].x - depth[0].x, 'side depth x'); near(side[1].y - side[0].y, depth[1].y - depth[0].y, 'side depth y');
+      near((side[2].x - side[1].x) * (br.y - tr.y), (side[2].y - side[1].y) * (br.x - tr.x), 'side face parallelogram');
+    }
+    near(Math.atan2(-(depth[1].y - depth[0].y), depth[1].x - depth[0].x) * 180 / Math.PI, 30, 'depth angle');
+  }
+  const apexes = preset.data.map(stage => {
+    const [tl, tr, br, bl] = faces(buildChartModel(preset.data, 'vertical', preset.options), stage.id).front;
+    const left = (bl.x - tl.x) / (bl.y - tl.y), right = (br.x - tr.x) / (br.y - tr.y);
+    return tl.y + (tr.x - tl.x) / (left - right);
+  });
+  for (const apex of apexes) near(apex, apexes[0], 'default preset shared apex');
+}
+console.log('Verified pure chart models for continuous, flat and isometric vertical, parallel isometric depth with a shared default apex, and connected branching flows.');
