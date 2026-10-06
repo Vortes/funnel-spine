@@ -14,6 +14,7 @@ const INK = '#2F4FE0';
 type Motion = {
   island: { enabled: boolean; lift: number; sideShift: number; cycle: number; stagger: number };
   flow: { enabled: boolean; fallTime: number; dotRate: number; dotSize: number };
+  texture: { enabled: boolean; mode: string; amount: number; noiseSize: number; boilRate: number; flowCycle: number };
   yieldToHover: boolean;
 };
 type Point = { x: number; y: number };
@@ -60,6 +61,25 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
         landFront: frontLeft.y, rate: data[index].value / data[0].value, carry: 0,
       };
     });
+    // Screen noise: one displacement filter shared by every face, so the field stays continuous across stages.
+    // Faces keep their clip paths, which apply after the filter, so edges and outlines stay crisp.
+    const noise = document.createElementNS(SVG, 'filter');
+    noise.id = 'idle-noise';
+    for (const [name, value] of [['x', '-5%'], ['y', '-5%'], ['width', '110%'], ['height', '110%'], ['color-interpolation-filters', 'sRGB']]) noise.setAttribute(name, value);
+    const layer = (tag: string, attributes: Record<string, string>) => {
+      const node = document.createElementNS(SVG, tag);
+      for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, value);
+      noise.append(node);
+      return node;
+    };
+    const turbulenceA = layer('feTurbulence', { type: 'fractalNoise', numOctaves: '1', seed: '1', result: 'a' });
+    const turbulenceB = layer('feTurbulence', { type: 'fractalNoise', numOctaves: '1', seed: '2', result: 'b' });
+    const blend = layer('feComposite', { in: 'a', in2: 'b', operator: 'arithmetic', k1: '0', k2: '1', k3: '0', k4: '0', result: 'field' });
+    const displacement = layer('feDisplacementMap', { in: 'SourceGraphic', in2: 'field', scale: '0', xChannelSelector: 'R', yChannelSelector: 'G' });
+    defs.append(noise);
+    const faces = stages.flatMap(group => [...group.querySelectorAll<SVGElement>('[data-face], [data-stage-front]')]);
+    const baseFilters = faces.map(face => face.getAttribute('filter'));
+    let filtered = false, seed = 3, blendPhase = 0, boilCarry = 0;
     const dots: Dot[] = [];
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     let intensity = 1, last = performance.now(), clock = 0, frame = 0;
@@ -86,6 +106,36 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
         const { x, y } = offsets[index];
         group.style.translate = x || y ? `${x.toFixed(3)}px ${y.toFixed(3)}px` : '';
       });
+      const texture = m.texture, strength = texture.enabled ? texture.amount * intensity : 0;
+      if (strength > .01 !== filtered) {
+        filtered = !filtered;
+        faces.forEach((face, index) => {
+          if (filtered) face.setAttribute('filter', 'url(#idle-noise)');
+          else if (baseFilters[index]) face.setAttribute('filter', baseFilters[index]!);
+          else face.removeAttribute('filter');
+        });
+      }
+      if (filtered) {
+        const frequency = String(1 / texture.noiseSize);
+        turbulenceA.setAttribute('baseFrequency', frequency); turbulenceB.setAttribute('baseFrequency', frequency);
+        if (texture.mode === 'boil') {
+          blendPhase = 0;
+          boilCarry += texture.boilRate * dt;
+          if (boilCarry >= 1) { boilCarry %= 1; seed += 1; turbulenceA.setAttribute('seed', String(seed)); }
+        } else {
+          blendPhase += dt / texture.flowCycle;
+          if (blendPhase >= 1) {
+            blendPhase %= 1; seed += 1;
+            turbulenceA.setAttribute('seed', turbulenceB.getAttribute('seed')!);
+            turbulenceB.setAttribute('seed', String(seed));
+          }
+        }
+        // Equal-power crossfade keeps the field's contrast close to constant while one noise pattern morphs into the next.
+        const mix = blendPhase * Math.PI / 2;
+        blend.setAttribute('k2', Math.cos(mix).toFixed(4)); blend.setAttribute('k3', Math.sin(mix).toFixed(4));
+        blend.setAttribute('k4', ((1 - Math.cos(mix) - Math.sin(mix)) * .5).toFixed(4));
+        displacement.setAttribute('scale', (strength * 4).toFixed(3));
+      }
       gaps.forEach((gap, index) => {
         gap.clip.setAttribute('y', String(gap.bottom + offsets[index].y - offsets[index + 1].y));
         if (!m.flow.enabled || intensity < .5) { gap.carry = 0; return; }
@@ -119,6 +169,11 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
       cancelAnimationFrame(frame);
       document.removeEventListener('visibilitychange', visibility);
       stages.forEach(group => { group.style.translate = ''; });
+      faces.forEach((face, index) => {
+        if (baseFilters[index]) face.setAttribute('filter', baseFilters[index]!);
+        else face.removeAttribute('filter');
+      });
+      noise.remove();
       gaps.forEach(gap => { gap.group.remove(); defs.querySelector(`#idle-gap-${gaps.indexOf(gap)}`)?.remove(); });
     };
   }, [root, motion]);
@@ -138,6 +193,17 @@ function IdleMotion() {
       fallTime: [540, 120, 3000, 10],
       dotRate: [8, 0, 60, 1],
       dotSize: [1, 0.3, 3, 0.05],
+    },
+    texture: {
+      enabled: true,
+      mode: { type: 'select', options: [
+        { value: 'boil', label: 'Boil' },
+        { value: 'flow', label: 'Flow' },
+      ], default: 'boil' },
+      amount: [0.6, 0, 6, 0.05],
+      noiseSize: [4, 1, 40, 0.5],
+      boilRate: [8, 1, 30, 1],
+      flowCycle: [1.5, 0.2, 10, 0.1],
     },
     yieldToHover: true,
     reset: { type: 'action', label: 'Reset' },
