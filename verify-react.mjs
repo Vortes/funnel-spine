@@ -125,11 +125,14 @@ const frames = new Map();
 let nextFrame = 0;
 dom.window.requestAnimationFrame = callback => { frames.set(++nextFrame, callback); return nextFrame; };
 dom.window.cancelAnimationFrame = id => frames.delete(id);
-const movePointer = async (x, y) => {
+const flushFrames = () => {
+  for (const [id, callback] of frames) { frames.delete(id); callback(); }
+};
+const movePointer = async (x, y, flush = true) => {
   const move = new dom.window.Event('pointermove', { bubbles: true });
   Object.defineProperties(move, { pointerType: { value: 'mouse' }, clientX: { value: x }, clientY: { value: y } });
   await act(async () => svg.dispatchEvent(move));
-  for (const [id, callback] of frames) { frames.delete(id); callback(); }
+  if (flush) flushFrames();
 };
 await movePointer(250, 140);
 assert.equal(inspected.at(-1), 'entry', 'inspection begins before the cursor reaches the stage');
@@ -139,8 +142,14 @@ const halfScale = Number(document.querySelector('#app [data-stage-focus="entry"]
 await movePointer(210, 140);
 const nearScale = Number(document.querySelector('#app [data-stage-focus="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
 assert(nearScale > halfScale, 'focus grows as the cursor approaches');
-await movePointer(150, 330);
+const incomingPosition = dom.window.getComputedStyle(document.querySelector('#app [data-stage="finish"]')).transform;
+await movePointer(150, 330, false);
 assert.equal(svg.getAttribute('data-switching'), 'true', 'a direct switch animates the old prism back into the stack');
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.transform, incomingPosition,
+  'the incoming focus starts at the visible stack position');
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '0',
+  'the incoming focus waits for the next frame before expanding');
+flushFrames();
 assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '1');
 assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '0');
 assert.deepEqual([...document.querySelectorAll('#app .atlas-vertical-stage')].map(group => group.dataset.stage), ['entry', 'finish'], 'stage DOM order stays fixed when switching rapidly');

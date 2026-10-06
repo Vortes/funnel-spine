@@ -86,7 +86,7 @@ function crossfadeDurationMs(svg: SVGSVGElement): number {
   return 150;
 }
 
-function paintVerticalFocus(svg: SVGSVGElement, stages: readonly Stage[], key: string | null, progress: number) {
+function paintVerticalFocus(svg: SVGSVGElement, stages: readonly Stage[], key: string | null, progress: number, heldFocusKey?: string | null) {
   const selectedIndex = stages.findIndex(stage => stage.id === key);
   const strength = selectedIndex < 0 ? 0 : progress;
   svg.querySelectorAll<SVGGElement>('.atlas-vertical-stage').forEach(group => {
@@ -97,6 +97,7 @@ function paintVerticalFocus(svg: SVGSVGElement, stages: readonly Stage[], key: s
     group.style.opacity = String(!strength ? 1 : selected ? 0 : 1 - .72 * strength);
   });
   svg.querySelectorAll<SVGGElement>('.atlas-vertical-focus').forEach(group => {
+    if (group.getAttribute('data-stage-focus') === heldFocusKey) return;
     const index = Number(group.getAttribute('data-stage-index'));
     const selected = index === selectedIndex && strength > 0;
     const ratio = stages[index].value / (stages[0]?.value || 1);
@@ -213,6 +214,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
   const recentKeyRef = useRef<{ key: string; at: number } | null>(null);
   const frameRef = useRef<number | null>(null);
   const switchTimerRef = useRef<number | null>(null);
+  const heldFocusRef = useRef<string | null>(null);
   const inspections = useMemo(() => new Map(model.marks.flatMap(mark => mark.type === 'path' && mark.inspection ? [[mark.inspection.key, mark.inspection] as const] : [])), [model]);
   const activeKey = variant === 'vertical'
     ? [focusKey, hoverKey, pinnedKey].find(key => key && inspections.has(key)) ?? null
@@ -240,7 +242,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
     const nearby = proximityRef.current;
     const key = [focusKey, nearby.key, pinnedKey].find(item => item && inspections.has(item)) ?? null;
     const progress = focusKey || !nearby.key && pinnedKey ? 1 : nearby.progress;
-    paintVerticalFocus(svg, verticalData, key, progress);
+    paintVerticalFocus(svg, verticalData, key, progress, heldFocusRef.current);
   }, [verticalData, model, focusKey, pinnedKey, hoverKey, inspections]);
   useEffect(() => () => {
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
@@ -248,6 +250,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
     if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
     switchTimerRef.current = null;
     recentKeyRef.current = null;
+    heldFocusRef.current = null;
     svgRef.current?.removeAttribute('data-switching');
   }, [model]);
   const stopFrame = () => {
@@ -276,7 +279,23 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
     if (previous !== next.key) {
       if (outgoing && next.key && outgoing !== next.key && verticalTransition !== 'none' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
         if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
+        const stage = [...svg.querySelectorAll<SVGGElement>('.atlas-vertical-stage')]
+          .find(group => group.getAttribute('data-stage') === next.key);
+        const focus = [...svg.querySelectorAll<SVGGElement>('.atlas-vertical-focus')]
+          .find(group => group.getAttribute('data-stage-focus') === next.key);
+        if (stage && focus && Number(window.getComputedStyle(focus).opacity) < .01) {
+          const startingTransform = window.getComputedStyle(stage).transform;
+          focus.style.transition = 'none';
+          focus.style.transform = startingTransform;
+          focus.style.opacity = '0';
+          // Establish the stack position before the next frame animates toward focus.
+          window.getComputedStyle(focus).transform;
+          focus.style.removeProperty('transition');
+          heldFocusRef.current = next.key;
+        } else heldFocusRef.current = null;
         svg.setAttribute('data-switching', 'true');
+        // Apply the handoff transition before React paints the new targets.
+        window.getComputedStyle(stage ?? svg).transitionProperty;
         switchTimerRef.current = window.setTimeout(() => {
           svg.removeAttribute('data-switching');
           switchTimerRef.current = null;
@@ -289,6 +308,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
       frameRef.current = null;
       const nearby = proximityRef.current;
       const key = nearby.key ?? (pinnedKey && inspections.has(pinnedKey) ? pinnedKey : null);
+      heldFocusRef.current = null;
       paintVerticalFocus(svg, verticalData, key, nearby.key ? nearby.progress : key ? 1 : 0);
     });
   };
@@ -296,6 +316,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
     if (!verticalData || event.pointerType !== 'mouse') return;
     const svg = svgRef.current;
     proximityRef.current = { key: null, progress: 0 };
+    heldFocusRef.current = null;
     recentKeyRef.current = null;
     stopFrame();
     svg?.removeAttribute('data-pointer-tracking');
