@@ -61,7 +61,7 @@ export const defaultConfigs={
     "seed": 1515972923,
     "dataOrigin": "seed",
     "options": {
-      "texture": "mixed",
+      "texture": "am",
       "density": 3,
       "strokeWidth": 0.5,
       "patternAngle": -45,
@@ -78,13 +78,53 @@ export const defaultConfigs={
       "stageGap": 20,
       "proximityRadius": 20,
       "capCurve": 0,
-      "borderRadius": 3,
+      "borderRadius": 6,
       "tailRatio": 0.15,
       "nodeGap": 66,
       "nodeWidth": 2.5,
       "verticalView": "isometric",
       "isoDepth": 36,
-      "isoRotation": 30
+      "isoRotation": 30,
+      "verticalViews": {
+        "isometric": {
+          "texture": "am",
+          "density": 3,
+          "strokeWidth": 0.5,
+          "patternAngle": -45,
+          "dotGain": 0.2,
+          "roughness": 0.15,
+          "fontSize": 14,
+          "labels": true,
+          "paperGrain": true,
+          "stageHeight": 330,
+          "stageGap": 20,
+          "proximityRadius": 20,
+          "capCurve": 0,
+          "borderRadius": 6,
+          "tailRatio": 0.15,
+          "isoDepth": 36,
+          "isoRotation": 30
+        },
+        "flat": {
+          "texture": "mixed",
+          "density": 3,
+          "strokeWidth": 0.5,
+          "patternAngle": -45,
+          "dotGain": 0.2,
+          "roughness": 0.15,
+          "fontSize": 14,
+          "labels": true,
+          "paperGrain": true,
+          "stageHeight": 330,
+          "stageGap": 20,
+          "proximityRadius": 20,
+          "capCurve": 0,
+          "borderRadius": 3,
+          "tailRatio": 0.15,
+          "isoDepth": 36,
+          "isoRotation": 30
+        }
+      }
     },
     "data": [
       {

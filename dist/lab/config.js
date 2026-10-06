@@ -22,7 +22,7 @@ export function sampleData(variant,seed){
    {source:'paid-signup',target:'paid-active',value:paidActive},{source:'paid-signup',target:'paid-inactive',value:paidSignup-paidActive}]
  };
 }
-export function createConfig(variant,seed=defaultConfigs[variant].seed){const config=structuredClone(defaultConfigs[variant]);if(variant==='vertical')config.options.verticalViews={isometric:verticalSettings(config.options),flat:verticalSettings(config.options)};if(seed!==config.seed){config.seed=seed;config.data=sampleData(variant,seed);}return config;}
+export function createConfig(variant,seed=defaultConfigs[variant].seed){const config=structuredClone(defaultConfigs[variant]);if(variant==='vertical'){const views=config.options.verticalViews;config.options.verticalViews={isometric:verticalSettings({...config.options,...views?.isometric}),flat:verticalSettings({...config.options,...views?.flat})};}if(seed!==config.seed){config.seed=seed;config.data=sampleData(variant,seed);}return config;}
 export function parseConfig(input){
  if(!input||![1,2,3].includes(input.version)||![...variants,'isometric'].includes(input.variant))throw new Error('Choose an atlas lab configuration with version 1, 2, or 3 and a supported variant.');
  if(!Number.isInteger(input.seed)||input.seed<0||input.seed>4294967295)throw new Error('Seed must be an integer between 0 and 4294967295.');
