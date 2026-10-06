@@ -112,7 +112,7 @@ export function PrintSettings({ variant, options, seed, seedDraft, onOptionChang
         {rows.map(row => <RangeControl key={row[0]} row={row} value={options[row[0]] as number} onChange={value => onOptionChange(row[0], value)} />)}
       </fieldset>)}
       {variant === 'vertical' && <fieldset><legend>Interaction</legend>
-        <RangeControl row={proximity} value={options.proximityRadius ?? 100} onChange={value => onOptionChange('proximityRadius', value)} />
+        <RangeControl row={proximity} value={options.proximityRadius ?? 20} onChange={value => onOptionChange('proximityRadius', value)} />
       </fieldset>}
       {toggles.map(([key, label]) => <label className="toggle" htmlFor={key} key={key}>{label}
         <input id={key} type="checkbox" checked={options[key] as boolean} onChange={event => onOptionChange(key, event.target.checked)} />

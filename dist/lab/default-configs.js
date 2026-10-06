@@ -76,7 +76,7 @@ export const defaultConfigs={
       "edgeFade": 0,
       "stageHeight": 330,
       "stageGap": 20,
-      "proximityRadius": 100,
+      "proximityRadius": 20,
       "capCurve": 0,
       "borderRadius": 3,
       "tailRatio": 0.15,

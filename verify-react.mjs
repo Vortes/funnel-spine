@@ -27,6 +27,7 @@ assert.throws(() => renderToString(createElement(AtlasFunnel, {
   data: stages, variant: 'vertical', options: { verticalView: 'flat', verticalViews: { flat: {}, isometric: { tailRatio: 1 } } },
 })), /terminal taper/);
 const verticalConfig = createConfig('vertical');
+assert.equal(verticalConfig.options.proximityRadius, 20);
 assert.equal(normalizeOptions(verticalConfig.options).isoDepth, verticalConfig.options.verticalViews.isometric.isoDepth);
 const serverVertical = renderToString(createElement(AtlasFunnel, { data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 } }));
 assert.match(serverVertical, /data-stage-face="entry"/);
@@ -95,7 +96,7 @@ assert.equal(inspected.at(-1), 'link:root:left');
 await act(async () => root.render(createElement(AtlasFunnel, { data: stages, variant: 'vertical', onInspect: info => inspected.push(info?.key ?? null) })));
 assert.equal(document.querySelectorAll('#app [data-stage-face]').length, 0);
 await act(async () => root.render(createElement(AtlasFunnel, {
-  data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 },
+  data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65, proximityRadius: 100 },
   onInspect: info => inspected.push(info?.key ?? null),
 })));
 await act(async () => document.querySelector('#app [data-key="entry"]').dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
@@ -148,6 +149,16 @@ await movePointer(500, 140);
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1');
 assert.equal(inspected.at(-1), null);
 assert.equal(svg.hasAttribute('data-proximity-active'), false);
+await act(async () => root.render(createElement(AtlasFunnel, {
+  data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 },
+  onInspect: info => inspected.push(info?.key ?? null),
+})));
+await movePointer(250, 140);
+assert.equal(svg.hasAttribute('data-proximity-active'), false, 'the default radius does not reach a stage 50 px away');
+await movePointer(210, 140);
+assert.equal(svg.getAttribute('data-proximity-active'), 'true');
+assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.64', 'the default radius is 20 px');
+await movePointer(500, 140);
 await act(async () => root.render(createElement(AtlasFunnel, {
   data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65, proximityRadius: 0 },
   onInspect: info => inspected.push(info?.key ?? null),

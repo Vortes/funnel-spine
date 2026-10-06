@@ -1101,7 +1101,7 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
     if (!verticalData || event.pointerType !== "mouse" || event.buttons || focusKey) return;
     const svg = svgRef.current;
     if (!svg) return;
-    const next = proximityAt(svg, event.clientX, event.clientY, normalized.proximityRadius ?? 100);
+    const next = proximityAt(svg, event.clientX, event.clientY, normalized.proximityRadius ?? 20);
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches && next.progress < 1) {
       next.key = null;
       next.progress = 0;
