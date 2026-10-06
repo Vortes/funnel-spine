@@ -88,6 +88,7 @@ export function PrintSettings({ variant, options, seed, seedDraft, onOptionChang
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [variant]);
   const choices = ['mixed', ...screenTypes];
   const geometry = variant === 'vertical' ? shapes.vertical[options.verticalView ?? 'flat'] : shapes[variant];
+  const proximity: RangeRow = ['proximityRadius', 'Proximity radius', 0, 240, 10, 'px'];
   const toggles: [keyof LabOptions, string][] = variant === 'vertical'
     ? [['labels', 'Direct annotations'], ['paperGrain', 'Paper grain']]
     : [['labels', 'Direct annotations'], ['guides', 'Stage guides'], ['paperGrain', 'Paper grain']];
@@ -110,6 +111,9 @@ export function PrintSettings({ variant, options, seed, seedDraft, onOptionChang
         <legend>{title}</legend>
         {rows.map(row => <RangeControl key={row[0]} row={row} value={options[row[0]] as number} onChange={value => onOptionChange(row[0], value)} />)}
       </fieldset>)}
+      {variant === 'vertical' && <fieldset><legend>Interaction</legend>
+        <RangeControl row={proximity} value={options.proximityRadius ?? 100} onChange={value => onOptionChange('proximityRadius', value)} />
+      </fieldset>}
       {toggles.map(([key, label]) => <label className="toggle" htmlFor={key} key={key}>{label}
         <input id={key} type="checkbox" checked={options[key] as boolean} onChange={event => onOptionChange(key, event.target.checked)} />
       </label>)}

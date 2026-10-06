@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, memo, useId, useMemo, useState, type HTMLAttributes, type ReactNode } from 'react';
+import { forwardRef, memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { normalizeOptions } from '../../dist/lab/options.js';
 import { buildChartModel, type ChartMark, type ChartModel, type FunnelGraph, type FunnelVariant, type Inspection, type Stage } from '../chart/model';
 import { ScreenDefs } from './ScreenDefs';
@@ -25,6 +25,7 @@ export type FunnelOptions = {
   mirror?: boolean;
   stageHeight?: number;
   stageGap?: number;
+  proximityRadius?: number;
   capCurve?: number;
   borderRadius?: number;
   tailRatio?: number;
@@ -60,6 +61,36 @@ const emptyOptions: FunnelOptions = Object.freeze({});
 const StableScreenDefs = memo(ScreenDefs);
 const format = (value: number) => new Intl.NumberFormat('en-US').format(value);
 const percent = (value: number, total: number) => total ? `${(100 * value / total).toFixed(1)}%` : '—';
+
+function proximityAt(svg: SVGSVGElement, x: number, y: number, radius: number): { key: string | null; progress: number } {
+  let key: string | null = null, distance = Infinity;
+  svg.querySelectorAll<SVGGElement>('[data-hit-stage]').forEach(hit => {
+    const bounds = hit.getBoundingClientRect();
+    const dx = Math.max(bounds.left - x, 0, x - bounds.right);
+    const dy = Math.max(bounds.top - y, 0, y - bounds.bottom);
+    const next = Math.hypot(dx, dy);
+    if (next < distance) { distance = next; key = hit.getAttribute('data-key'); }
+  });
+  const raw = radius ? Math.max(0, 1 - distance / radius) : Number(distance === 0);
+  return raw > 0 ? { key, progress: raw * raw * (3 - 2 * raw) } : { key: null, progress: 0 };
+}
+
+function paintVerticalFocus(svg: SVGSVGElement, stages: readonly Stage[], key: string | null, progress: number) {
+  const selectedIndex = stages.findIndex(stage => stage.id === key);
+  const strength = selectedIndex < 0 ? 0 : progress;
+  svg.querySelectorAll<SVGGElement>('.atlas-vertical-stage').forEach(group => {
+    const index = Number(group.getAttribute('data-stage-index'));
+    const selected = index === selectedIndex;
+    const ratio = stages[index].value / (stages[0]?.value || 1);
+    const zoom = 1.06 + .36 * (1 - ratio);
+    group.style.transform = selected ? `scale(${1 + (zoom - 1) * strength})`
+      : strength ? `translateY(${(index < selectedIndex ? -22 : 22) * strength}px) scale(${1 - .02 * strength})` : 'none';
+    group.style.opacity = String(selected || !strength ? 1 : 1 - .72 * strength);
+  });
+  svg.querySelectorAll<SVGGElement>('.atlas-vertical-annotation').forEach(group => {
+    group.style.opacity = String(!strength || group.getAttribute('data-stage-annotation') === key ? 1 : 1 - .6 * strength);
+  });
+}
 
 function connectedLinks(model: ChartModel, key: string): Set<string> {
   const active = model.marks.find(mark => mark.type === 'path' && mark.inspection?.key === key);
@@ -159,6 +190,9 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [pinnedKey, setPinnedKey] = useState<string | null>(null);
   const [keyboardMotion, setKeyboardMotion] = useState(false);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const proximityRef = useRef<{ key: string | null; progress: number }>({ key: null, progress: 0 });
+  const frameRef = useRef<number | null>(null);
   const inspections = useMemo(() => new Map(model.marks.flatMap(mark => mark.type === 'path' && mark.inspection ? [[mark.inspection.key, mark.inspection] as const] : [])), [model]);
   const activeKey = variant === 'vertical'
     ? [focusKey, hoverKey, pinnedKey].find(key => key && inspections.has(key)) ?? null
@@ -182,19 +216,77 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
   }) ?? [];
   const orderedStages = selectedIndex < 0 ? verticalStages
     : [...verticalStages.filter(item => item.index !== selectedIndex), verticalStages[selectedIndex]];
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || !verticalData) return;
+    const nearby = proximityRef.current;
+    const key = [focusKey, nearby.key, pinnedKey].find(item => item && inspections.has(item)) ?? null;
+    const progress = focusKey || !nearby.key && pinnedKey ? 1 : nearby.progress;
+    paintVerticalFocus(svg, verticalData, key, progress);
+  }, [verticalData, model, focusKey, pinnedKey, hoverKey, inspections]);
+  useEffect(() => () => {
+    if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+  }, [model]);
+  const stopFrame = () => {
+    if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+  };
+  const trackProximity = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!verticalData || event.pointerType !== 'mouse' || event.buttons || focusKey) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const next = proximityAt(svg, event.clientX, event.clientY, normalized.proximityRadius ?? 100);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches && next.progress < 1) {
+      next.key = null;
+      next.progress = 0;
+    }
+    const previous = proximityRef.current.key;
+    proximityRef.current = next;
+    setKeyboardMotion(false);
+    svg.setAttribute('data-pointer-tracking', 'true');
+    if (previous !== next.key) {
+      setHoverKey(next.key);
+      onInspect?.(next.key ? inspections.get(next.key) ?? null : pinnedKey ? inspections.get(pinnedKey) ?? null : null);
+    }
+    if (frameRef.current === null) frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = null;
+      const nearby = proximityRef.current;
+      const key = nearby.key ?? (pinnedKey && inspections.has(pinnedKey) ? pinnedKey : null);
+      paintVerticalFocus(svg, verticalData, key, nearby.key ? nearby.progress : key ? 1 : 0);
+    });
+  };
+  const leaveProximity = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (!verticalData || event.pointerType !== 'mouse') return;
+    const svg = svgRef.current;
+    proximityRef.current = { key: null, progress: 0 };
+    stopFrame();
+    svg?.removeAttribute('data-pointer-tracking');
+    setHoverKey(null);
+    const key = focusKey ?? pinnedKey;
+    if (svg) paintVerticalFocus(svg, verticalData, key, key ? 1 : 0);
+    onInspect?.(key ? inspections.get(key) ?? null : null);
+  };
   const clearPinned = () => {
     setPinnedKey(null);
     if (!hoverKey && !focusKey) onInspect?.(null);
   };
   return <div {...rootProps} ref={ref} style={{ display: 'block', ...style }}>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox={viewBox ?? `0 0 ${model.width} ${model.height}`} width="100%"
+    <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={viewBox ?? `0 0 ${model.width} ${model.height}`} width="100%"
       role="group" aria-label={`${variant} conversion funnel`} style={{ display: 'block', height: 'auto', minWidth: model.width > 900 ? model.width : undefined }}
-      onPointerUp={verticalData ? event => { if (event.pointerType !== 'mouse' && !(event.target as Element).closest('[data-hit-stage]')) clearPinned(); } : undefined}>
+      onPointerEnter={verticalData ? trackProximity : undefined} onPointerMove={verticalData ? trackProximity : undefined}
+      onPointerLeave={verticalData ? leaveProximity : undefined}
+      onPointerUp={verticalData ? event => { if (event.pointerType !== 'mouse' && !(event.target as Element).closest('[data-hit-stage]')) {
+        stopFrame(); proximityRef.current = { key: null, progress: 0 };
+        svgRef.current?.removeAttribute('data-pointer-tracking');
+        setHoverKey(null); clearPinned();
+      } } : undefined}>
       {verticalData && <style>{`
         .atlas-vertical-stage { transform-box: view-box; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
         .atlas-vertical-annotation { transition: opacity 150ms ease; }
         .atlas-vertical-hit { cursor: pointer; }
         .atlas-vertical-hit:focus { outline: none; }
+        [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-annotation { transition: none; }
         @media (prefers-reduced-motion: reduce) { .atlas-vertical-stage, .atlas-vertical-annotation { transition: none; } }
         [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none; }
       `}</style>}
@@ -205,15 +297,9 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
       <rect width={model.width} height={model.height} fill={normalized.paperGrain ? `url(#${idPrefix}-grain)` : PAPER} />
       {verticalData ? <g data-keyboard-motion={keyboardMotion ? 'off' : undefined}>
         {orderedStages.map(({ stage, index, marks, front }) => {
-          const selected = index === selectedIndex;
-          const displaced = selectedIndex >= 0 && !selected;
-          const ratio = stage.value / (verticalData[0]?.value || 1);
-          const scale = 1.06 + .36 * (1 - ratio);
-          const transform = selected ? `scale(${scale})`
-            : displaced ? `translateY(${index < selectedIndex ? -22 : 22}px) scale(.98)` : 'none';
-          return <g key={stage.id} className="atlas-vertical-stage" data-stage={stage.id}
-            data-active={selected || undefined} style={{ transform, transformOrigin: front?.type === 'path' && front.focus
-              ? `${front.focus.x}px ${front.focus.y}px` : undefined, opacity: displaced ? .28 : 1 }}>
+          return <g key={stage.id} className="atlas-vertical-stage" data-stage={stage.id} data-stage-index={index}
+            data-active={index === selectedIndex || undefined} style={{ transformOrigin: front?.type === 'path' && front.focus
+              ? `${front.focus.x}px ${front.focus.y}px` : undefined }}>
             {marks.map(mark => <Mark key={mark.key} mark={mark} idPrefix={idPrefix}
               activeKey={activeKey} visibleKeys={null} roughness={normalized.roughness ?? .15}
               onPreview={preview} onLeave={leave} verticalStage />)}
@@ -222,7 +308,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
           </g>;
         })}
         {verticalStages.map(({ stage, annotations }) => <g key={`annotation:${stage.id}`} className="atlas-vertical-annotation"
-          data-stage-annotation={stage.id} style={{ opacity: selectedIndex >= 0 && stage.id !== activeKey ? .4 : 1 }}>
+          data-stage-annotation={stage.id}>
           {annotations.map(mark => <Mark key={mark.key} mark={mark} idPrefix={idPrefix}
             activeKey={activeKey} visibleKeys={null} roughness={normalized.roughness ?? .15}
             onPreview={preview} onLeave={leave} />)}
@@ -234,10 +320,10 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
             className="atlas-vertical-hit" data-hit-stage="" data-key={info.key} tabIndex={0} role="button"
             aria-pressed={pinnedKey === info.key} aria-label={`${info.label}, ${format(info.value)}, ${percent(info.value, info.denominator)} conversion`}
             onPointerDown={event => event.preventDefault()}
-            onPointerEnter={event => { if (event.pointerType === 'mouse') { setKeyboardMotion(false); preview(info); } }}
-            onPointerLeave={event => { if (event.pointerType === 'mouse') { setHoverKey(null); onInspect?.(pinnedKey ? inspections.get(pinnedKey) ?? null : null); } }}
             onPointerUp={event => { if (event.pointerType !== 'mouse') {
-              event.stopPropagation(); setKeyboardMotion(false);
+              event.stopPropagation(); stopFrame(); proximityRef.current = { key: null, progress: 0 };
+              svgRef.current?.removeAttribute('data-pointer-tracking');
+              setHoverKey(null); setKeyboardMotion(false);
               const next = pinnedKey === info.key ? null : info.key;
               setPinnedKey(next); onInspect?.(next ? info : null);
             } }}

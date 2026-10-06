@@ -19,6 +19,7 @@ export type FunnelOptions = {
     mirror?: boolean;
     stageHeight?: number;
     stageGap?: number;
+    proximityRadius?: number;
     capCurve?: number;
     borderRadius?: number;
     tailRatio?: number;

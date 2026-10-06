@@ -40,6 +40,7 @@ await waitFor(() => document.querySelector('#canvas [data-stage="converted"]')?.
 document.querySelector('#svg-export').click();
 const exportedSvg = new JSDOM(await exported.text(), { contentType: 'image/svg+xml' }).window.document;
 assert.equal(exportedSvg.querySelectorAll('[data-hit-stage],[data-focus-outline]').length, 0);
+assert.equal(exportedSvg.querySelectorAll('[data-pointer-tracking]').length, 0);
 assert([...exportedSvg.querySelectorAll('.atlas-vertical-stage')].every(stage => !stage.style.transform && !stage.style.transformOrigin && !stage.style.opacity));
 assert(exportedSvg.querySelector('[data-stage-front="converted"]').getAttribute('fill').startsWith('url(#'));
 URL.createObjectURL = createObjectURL;

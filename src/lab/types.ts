@@ -2,8 +2,8 @@ import type { FunnelOptions, FunnelVariant, Inspection } from '../react/AtlasFun
 import type { FunnelData } from '../chart/model';
 
 export type Variant = FunnelVariant;
-export type LabOptions = Required<Omit<FunnelOptions, 'mirror' | 'verticalView' | 'verticalViews' | 'isoDepth' | 'isoRotation'>> &
-  Pick<FunnelOptions, 'mirror' | 'verticalView' | 'verticalViews' | 'isoDepth' | 'isoRotation'>;
+export type LabOptions = Required<Omit<FunnelOptions, 'mirror' | 'verticalView' | 'verticalViews' | 'isoDepth' | 'isoRotation' | 'proximityRadius'>> &
+  Pick<FunnelOptions, 'mirror' | 'verticalView' | 'verticalViews' | 'isoDepth' | 'isoRotation' | 'proximityRadius'>;
 export type LabConfig = {
   version: 3;
   variant: Variant;

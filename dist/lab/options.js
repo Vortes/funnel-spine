@@ -4,7 +4,7 @@ export const ranges = {
   density: [3, 14], strokeWidth: [.25, .75], patternAngle: [-90, 90],
   dotGain: [-.8, .2], roughness: [0, .6], fontSize: [12, 18],
   curve: [.1, .8], chartHeight: [120, 265], edgeFade: [0, .45],
-  stageHeight: [250, 330], stageGap: [0, 20], capCurve: [0, 20],
+  stageHeight: [250, 330], stageGap: [0, 20], proximityRadius: [0, 240], capCurve: [0, 20],
   borderRadius: [0, 20], tailRatio: [.15, 1], isoDepth: [18, 200],
   isoRotation: [-45, 45], nodeGap: [28, 85],
   nodeWidth: [1, 6],
@@ -21,7 +21,7 @@ export const defaultOptions = {
 export const verticalControlKeys = [
   'texture', 'density', 'strokeWidth', 'patternAngle', 'dotGain',
   'roughness', 'fontSize', 'labels', 'paperGrain', 'stageHeight',
-  'stageGap', 'capCurve', 'borderRadius', 'tailRatio', 'isoDepth',
+  'stageGap', 'proximityRadius', 'capCurve', 'borderRadius', 'tailRatio', 'isoDepth',
   'isoRotation',
 ];
 
