@@ -88,7 +88,7 @@ export function FigurePanel({ config, crossfadeDuration, verticalTransition, int
       <span id="figure-number" className="overline">FIG. 00{index + 1}</span>
       <h2 id="figure-title">{titles[config.variant]}</h2>
       <p className="figure-subtitle">{config.variant === 'branching' ? 'One entry bucket. Every split distributes 100% to its children.' : 'A study of quantity, progression, and loss.'}</p>
-    </div><div className="figure-actions"><a href="/lab/benchmark.html">Stipple benchmark ↗</a><a href="/lab/vertical-particles/">Particle study ↗</a><button id="svg-export" disabled={Boolean(error) || !infos.length} onClick={onExport}>Export SVG</button></div></div>
+    </div><div className="figure-actions"><a href="/lab/benchmark.html">Stipple benchmark ↗</a><a href="/lab/vertical-particles/">Particle study ↗</a><a href="/lab/idle-motion/">Idle motion ↗</a><button id="svg-export" disabled={Boolean(error) || !infos.length} onClick={onExport}>Export SVG</button></div></div>
     <div className="ink-spec"><span className="ink-mark" aria-hidden="true" /><span>BLUE 01 <b>#2F4FE0</b></span><span>COOL GRAY STOCK <b>#E4E5E8</b></span><span>ONE SPOT INK</span></div>
     <FunnelCanvas config={config} crossfadeDuration={crossfadeDuration} verticalTransition={verticalTransition} introToken={introToken} onInspect={onInspect} onPathsChange={onPathsChange} onRenderError={onRenderError} svgRef={svgRef} />
     <ScreenLegend options={config.options} seed={config.seed} />

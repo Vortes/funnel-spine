@@ -32,3 +32,9 @@ document.querySelector('#figure').replaceChildren(svg);
 ```
 
 Open `/lab/benchmark.html` to compare the shader and original vector field on the same seeded figure. It reports median cold build and first-frame times over three seeds, warm reuse, dot count, and serialized SVG size, with side-by-side previews. Serve `dist/` over HTTP for development. From the repository root run `node verify-lab.mjs` to check deterministic sampling, configuration round trips, validation, and geometry at slider limits.
+
+## Idle motion prototype
+
+Open `/lab/idle-motion/` to tune idle motion for the isometric Vertical prism. It combines a floating island drift with data flowing between stages, and the main lab links to it. The page renders the default Vertical preset through `AtlasFunnel`. Its React source is `src/lab/idle-motion/main.tsx`, and `npm run build:lab` generates `idle.js`.
+
+Each stage drifts through the CSS `translate` property, so the drift composes with the proximity `transform` without replacing it. Island controls set lift (0–16 px), side shift (0–24 px), cycle length (1–20 s), and stagger between stages (0–4 s). Dots leave the hidden bottom face of one stage and land at the same depth on the next stage's top face, clipped below the source stage's front edge. Flow controls set fall time (120–3000 ms), dot rate at the widest gap (0–60 per second, scaled down by stage quantity), and dot radius (0.3–3 px). With Yield to hover on, both motions settle while a stage is inspected, pinned, or focused, then resume. Reduced motion disables both. The DialKit panel persists in this browser, and Reset restores the defaults. The motion affects this page only.

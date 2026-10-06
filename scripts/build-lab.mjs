@@ -18,6 +18,7 @@ const targets = [
   { entryPoints: ['src/lab/prism-comparison/main.tsx'], outfile: 'dist/lab/prism-comparison/comparison.js' },
   { entryPoints: ['src/lab/prism-comparison/comparison.css'], outfile: 'dist/lab/prism-comparison/comparison.css' },
   { entryPoints: ['src/lab/particle-main.tsx'], outfile: 'dist/lab/vertical-particles/study.js' },
+  { entryPoints: ['src/lab/idle-motion/main.tsx'], outfile: 'dist/lab/idle-motion/idle.js' },
 ];
 
 export function buildLab() {
