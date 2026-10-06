@@ -15,6 +15,8 @@ function browser(html) {
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
   Object.defineProperty(dom.window.document, 'timeline', { value: { currentTime: 0 } });
   dom.window.Element.prototype.animate = () => ({ play() {}, pause() {}, cancel() {}, startTime: 0 });
+  globalThis.requestAnimationFrame = callback => setTimeout(() => callback(performance.now()), 16);
+  globalThis.cancelAnimationFrame = clearTimeout;
   return dom;
 }
 
@@ -37,6 +39,11 @@ assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribut
 assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-crossfade-duration'), '150ms');
 assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-proximity-duration'), '240ms');
 assert.equal(document.querySelector('#canvas svg')?.getAttribute('data-vertical-transition'), 'crossfade');
+await waitFor(() => document.querySelector('#canvas [data-idle-flow] circle') && document.querySelector('#canvas [data-idle-hatch] circle')
+  && document.querySelector('#canvas .atlas-vertical-stage').style.translate, 'idle motion in isometric view');
+assert.equal(document.querySelectorAll('#canvas [data-idle-hatch]').length, 5);
+assert.equal(document.querySelectorAll('#canvas [data-idle-flow]').length, 4);
+await waitFor(() => document.querySelector('[aria-label="Lift"]'), 'DialKit idle motion controls');
 const createObjectURL = URL.createObjectURL, revokeObjectURL = URL.revokeObjectURL;
 const anchorClick = dom.window.HTMLAnchorElement.prototype.click;
 let exported;
@@ -54,11 +61,15 @@ assert.equal(exportedSvg.querySelectorAll('[data-switching]').length, 0);
 assert.equal(exportedSvg.querySelectorAll('[data-proximity-transition]').length, 0);
 assert([...exportedSvg.querySelectorAll('.atlas-vertical-stage')].every(stage => !stage.style.transform && !stage.style.transformOrigin && !stage.style.opacity));
 assert(exportedSvg.querySelector('[data-stage-front="converted"]').getAttribute('fill').startsWith('url(#'));
+assert.equal(exportedSvg.querySelectorAll('[data-idle-flow],[data-idle-hatch],[data-idle-clip]').length, 0);
+assert([...exportedSvg.querySelectorAll('.atlas-vertical-stage')].every(stage => !stage.style.translate));
 URL.createObjectURL = createObjectURL;
 URL.revokeObjectURL = revokeObjectURL;
 dom.window.HTMLAnchorElement.prototype.click = anchorClick;
 document.querySelector('[aria-label="Vertical view"] button:last-child').click();
 await waitFor(() => document.querySelectorAll('#canvas [data-stage-face]').length === 0, 'flat vertical view');
+await waitFor(() => !document.querySelector('#canvas [data-idle-flow],#canvas [data-idle-hatch],#canvas [data-idle-clip]'), 'idle motion off in flat view');
+assert([...document.querySelectorAll('#canvas .atlas-vertical-stage')].every(stage => !stage.style.translate));
 document.querySelector('[data-variant="continuous"]').click();
 await waitFor(() => document.querySelectorAll('#canvas [data-key]').length === 4, 'continuous figure');
 const halfPath = document.querySelector('#canvas [data-key]').getAttribute('d');
@@ -109,4 +120,4 @@ assert.equal(document.querySelectorAll('.comparison-header span').length, 2);
 assert.equal(document.querySelector('button'), null, 'the comparison page contains no lab controls');
 dom.window.close();
 
-console.log('Verified React lab views, mirrored geometry, branching inspection, data validation, particle rendering, playback controls, and the standalone prism comparison.');
+console.log('Verified React lab views, mirrored geometry, branching inspection, data validation, particle rendering, playback controls, idle motion with clean export, and the standalone prism comparison.');

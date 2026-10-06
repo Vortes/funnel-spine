@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { AtlasFunnel } from '../react/AtlasFunnel';
 import type { VerticalTransition } from '../react/AtlasFunnel';
 import { buildChartModel, type FunnelGraph, type Stage } from '../chart/model';
+import { useIdleMotion, type IdleMotionValues } from './idle-motion/motion';
 import { ScreenLegend } from './Controls';
 import { format, percent } from './utils';
 import type { LabConfig, LabSvg, PathInfo, Variant } from './types';
@@ -13,8 +14,8 @@ const captions = {
   branching: '03 / Connected buckets · every split distributes 100%',
 };
 
-function FunnelCanvas({ config, crossfadeDuration, verticalTransition, introToken, onInspect, onPathsChange, onRenderError, svgRef }: {
-  config: LabConfig; crossfadeDuration: number; verticalTransition: VerticalTransition; introToken: number; onInspect: (info: PathInfo | null) => void;
+function FunnelCanvas({ config, crossfadeDuration, verticalTransition, introToken, idleMotion, onInspect, onPathsChange, onRenderError, svgRef }: {
+  config: LabConfig; crossfadeDuration: number; verticalTransition: VerticalTransition; introToken: number; idleMotion: RefObject<IdleMotionValues>; onInspect: (info: PathInfo | null) => void;
   onPathsChange: (infos: PathInfo[]) => void; onRenderError: (error: string | null) => void;
   svgRef: RefObject<LabSvg | null>;
 }) {
@@ -29,6 +30,9 @@ function FunnelCanvas({ config, crossfadeDuration, verticalTransition, introToke
     }
   }, [config]);
   useEffect(() => { onPathsChange(result.infos); onRenderError(result.error); }, [result, onPathsChange, onRenderError]);
+  const idleScene = useMemo(() => config.variant === 'vertical' && config.options.verticalView === 'isometric' && !result.error
+    ? { data: config.data as readonly Stage[], patternAngle: config.options.patternAngle, seed: config.seed } : null, [config, result.error]);
+  useIdleMotion(chart, idleMotion, idleScene);
   useLayoutEffect(() => {
     const svg = chart.current?.querySelector('svg') ?? null;
     svgRef.current = svg;
@@ -73,8 +77,8 @@ function FunnelCanvas({ config, crossfadeDuration, verticalTransition, introToke
   </div>;
 }
 
-export function FigurePanel({ config, crossfadeDuration, verticalTransition, introToken, inspected, infos, error, svgRef, onInspect, onPathsChange, onRenderError, onExport }: {
-  config: LabConfig; crossfadeDuration: number; verticalTransition: VerticalTransition; introToken: number; inspected: PathInfo | null;
+export function FigurePanel({ config, crossfadeDuration, verticalTransition, introToken, idleMotion, inspected, infos, error, svgRef, onInspect, onPathsChange, onRenderError, onExport }: {
+  config: LabConfig; crossfadeDuration: number; verticalTransition: VerticalTransition; introToken: number; idleMotion: RefObject<IdleMotionValues>; inspected: PathInfo | null;
   infos: PathInfo[]; error: string | null; svgRef: RefObject<LabSvg | null>;
   onInspect: (info: PathInfo | null) => void;
   onPathsChange: (infos: PathInfo[]) => void; onRenderError: (error: string | null) => void; onExport: () => void;
@@ -90,7 +94,7 @@ export function FigurePanel({ config, crossfadeDuration, verticalTransition, int
       <p className="figure-subtitle">{config.variant === 'branching' ? 'One entry bucket. Every split distributes 100% to its children.' : 'A study of quantity, progression, and loss.'}</p>
     </div><div className="figure-actions"><a href="/lab/benchmark.html">Stipple benchmark ↗</a><a href="/lab/vertical-particles/">Particle study ↗</a><a href="/lab/idle-motion/">Idle motion ↗</a><button id="svg-export" disabled={Boolean(error) || !infos.length} onClick={onExport}>Export SVG</button></div></div>
     <div className="ink-spec"><span className="ink-mark" aria-hidden="true" /><span>BLUE 01 <b>#2F4FE0</b></span><span>COOL GRAY STOCK <b>#E4E5E8</b></span><span>ONE SPOT INK</span></div>
-    <FunnelCanvas config={config} crossfadeDuration={crossfadeDuration} verticalTransition={verticalTransition} introToken={introToken} onInspect={onInspect} onPathsChange={onPathsChange} onRenderError={onRenderError} svgRef={svgRef} />
+    <FunnelCanvas config={config} crossfadeDuration={crossfadeDuration} verticalTransition={verticalTransition} introToken={introToken} idleMotion={idleMotion} onInspect={onInspect} onPathsChange={onPathsChange} onRenderError={onRenderError} svgRef={svgRef} />
     <ScreenLegend options={config.options} seed={config.seed} />
     <div className="caption"><span id="figure-caption">{caption}</span><span>{config.variant === 'vertical' ? 'Hover, tap, or focus to inspect' : 'Hover or focus to inspect'}</span></div>
     <div className="inspector" aria-live="polite"><div><span id="inspect-state">PATH INSPECTOR</span><strong id="inspect-path">{active?.label ?? 'Explore a ribbon'}</strong></div>

@@ -6,6 +6,7 @@ import { createConfig, parseConfig, sampleData, setVerticalControl, setVerticalV
 import { PrintSettings } from './Controls';
 import { Details, type DetailView } from './Details';
 import { FigurePanel } from './Figure';
+import { stripIdleMotion, useIdleMotionPanel } from './idle-motion/motion';
 import type { VerticalTransition } from '../react/AtlasFunnel';
 import { download } from './utils';
 import type { LabConfig, LabOptions, LabSvg, PathInfo, SavedConfig, Variant } from './types';
@@ -37,6 +38,7 @@ function App() {
     ], default: 'crossfade' },
     playbackSpeed: [1, 0.1, 4, 0.05],
   }, { id: 'prism-crossfade', persist: true });
+  const idleMotion = useIdleMotionPanel();
   const [configs, setConfigs] = useState<Record<Variant, LabConfig>>(() => Object.fromEntries(variants.map(variant => [variant, createConfig(variant)])) as Record<Variant, LabConfig>);
   const [variant, setVariant] = useState<Variant>('vertical');
   const [introToken, setIntroToken] = useState(0);
@@ -153,6 +155,7 @@ function App() {
     const rendered = svgRef.current;
     if (!rendered) return;
     const clone = rendered.cloneNode(true) as SVGSVGElement;
+    stripIdleMotion(clone);
     clone.classList.remove('chart-intro', 'chart-intro--vertical', 'chart-intro--continuous', 'chart-intro--branching');
     clone.querySelectorAll('[data-key]').forEach(path => {
       path.removeAttribute('tabindex');
@@ -215,7 +218,7 @@ function App() {
       <div className="workspace">
         <PrintSettings variant={variant} options={config.options} seed={config.seed} seedDraft={seedDraft} onOptionChange={updateOption} onVerticalViewChange={changeVerticalView} onSeedDraft={setSeedDraft} onSeedCommit={commitSeed} onSample={() => sample(crypto.getRandomValues(new Uint32Array(1))[0])} onReset={() => { replaceConfig(createConfig(variant) as LabConfig); showNotice('Variant reset'); }} />
         <div className="working-area">
-          <FigurePanel config={config} crossfadeDuration={150 / playbackSpeed} verticalTransition={animations ? transition as VerticalTransition : 'none'} introToken={introToken} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
+          <FigurePanel config={config} crossfadeDuration={150 / playbackSpeed} verticalTransition={animations ? transition as VerticalTransition : 'none'} introToken={introToken} idleMotion={idleMotion} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
           <Details config={config} view={view} dataDraft={dataDraft} dataError={dataError} infos={infos} onView={next => { setView(next); if (next === 'data') setDataDraft(JSON.stringify(config.data, null, 2)); }} onDataDraft={setDataDraft} onApplyData={applyData} onRestoreData={() => sample(config.seed)} onCopy={() => void copy()} />
         </div>
       </div>
