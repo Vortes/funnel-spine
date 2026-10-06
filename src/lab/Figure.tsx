@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { AtlasFunnel } from '../react/AtlasFunnel';
+import type { VerticalTransition } from '../react/AtlasFunnel';
 import { buildChartModel, type FunnelGraph, type Stage } from '../chart/model';
 import { ScreenLegend } from './Controls';
 import { format, percent } from './utils';
@@ -12,8 +13,8 @@ const captions = {
   branching: '03 / Connected buckets · every split distributes 100%',
 };
 
-function FunnelCanvas({ config, crossfadeDuration, introToken, onInspect, onPathsChange, onRenderError, svgRef }: {
-  config: LabConfig; crossfadeDuration: number; introToken: number; onInspect: (info: PathInfo | null) => void;
+function FunnelCanvas({ config, crossfadeDuration, verticalTransition, introToken, onInspect, onPathsChange, onRenderError, svgRef }: {
+  config: LabConfig; crossfadeDuration: number; verticalTransition: VerticalTransition; introToken: number; onInspect: (info: PathInfo | null) => void;
   onPathsChange: (infos: PathInfo[]) => void; onRenderError: (error: string | null) => void;
   svgRef: RefObject<LabSvg | null>;
 }) {
@@ -66,12 +67,13 @@ function FunnelCanvas({ config, crossfadeDuration, introToken, onInspect, onPath
       : config.variant === 'continuous'
         ? <AtlasFunnel {...shared} key="continuous" data={config.data as readonly Stage[]} variant="continuous">{cover}</AtlasFunnel>
         : <AtlasFunnel {...shared} key="vertical" data={config.data as readonly Stage[]} variant="vertical"
-          style={{ '--atlas-crossfade-duration': `${crossfadeDuration}ms` } as CSSProperties} />)}
+          verticalTransition={verticalTransition} style={{ '--atlas-crossfade-duration': `${crossfadeDuration}ms`,
+            '--atlas-overlap-delay': `${crossfadeDuration / 3}ms`, '--atlas-relay-duration': `${crossfadeDuration / 2}ms` } as CSSProperties} />)}
   </div>;
 }
 
-export function FigurePanel({ config, crossfadeDuration, introToken, inspected, infos, error, svgRef, onInspect, onPathsChange, onRenderError, onExport }: {
-  config: LabConfig; crossfadeDuration: number; introToken: number; inspected: PathInfo | null;
+export function FigurePanel({ config, crossfadeDuration, verticalTransition, introToken, inspected, infos, error, svgRef, onInspect, onPathsChange, onRenderError, onExport }: {
+  config: LabConfig; crossfadeDuration: number; verticalTransition: VerticalTransition; introToken: number; inspected: PathInfo | null;
   infos: PathInfo[]; error: string | null; svgRef: RefObject<LabSvg | null>;
   onInspect: (info: PathInfo | null) => void;
   onPathsChange: (infos: PathInfo[]) => void; onRenderError: (error: string | null) => void; onExport: () => void;
@@ -87,7 +89,7 @@ export function FigurePanel({ config, crossfadeDuration, introToken, inspected, 
       <p className="figure-subtitle">{config.variant === 'branching' ? 'One entry bucket. Every split distributes 100% to its children.' : 'A study of quantity, progression, and loss.'}</p>
     </div><div className="figure-actions"><a href="/lab/benchmark.html">Stipple benchmark ↗</a><a href="/lab/vertical-particles/">Particle study ↗</a><button id="svg-export" disabled={Boolean(error) || !infos.length} onClick={onExport}>Export SVG</button></div></div>
     <div className="ink-spec"><span className="ink-mark" aria-hidden="true" /><span>BLUE 01 <b>#2F4FE0</b></span><span>COOL GRAY STOCK <b>#E4E5E8</b></span><span>ONE SPOT INK</span></div>
-    <FunnelCanvas config={config} crossfadeDuration={crossfadeDuration} introToken={introToken} onInspect={onInspect} onPathsChange={onPathsChange} onRenderError={onRenderError} svgRef={svgRef} />
+    <FunnelCanvas config={config} crossfadeDuration={crossfadeDuration} verticalTransition={verticalTransition} introToken={introToken} onInspect={onInspect} onPathsChange={onPathsChange} onRenderError={onRenderError} svgRef={svgRef} />
     <ScreenLegend options={config.options} seed={config.seed} />
     <div className="caption"><span id="figure-caption">{caption}</span><span>{config.variant === 'vertical' ? 'Hover, tap, or focus to inspect' : 'Hover or focus to inspect'}</span></div>
     <div className="inspector" aria-live="polite"><div><span id="inspect-state">PATH INSPECTOR</span><strong id="inspect-path">{active?.label ?? 'Explore a ribbon'}</strong></div>

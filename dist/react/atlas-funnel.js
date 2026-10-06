@@ -904,6 +904,7 @@ function paintVerticalFocus(svg, stages, key, progress) {
     const zoom = 1.06 + 0.36 * (1 - ratio);
     group.style.transform = selected ? `scale(${1 + (zoom - 1) * strength})` : "none";
     group.style.opacity = selected ? "1" : "0";
+    group.toggleAttribute("data-visible", selected);
   });
   svg.querySelectorAll(".atlas-vertical-annotation").forEach((group) => {
     group.style.opacity = String(!strength || group.getAttribute("data-stage-annotation") === key ? 1 : 1 - 0.6 * strength);
@@ -1036,6 +1037,7 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
   onInspect,
   idPrefix: suppliedPrefix,
   viewBox,
+  verticalTransition = "crossfade",
   children,
   style,
   ...rootProps
@@ -1148,6 +1150,7 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
       width: "100%",
       role: "group",
       "aria-label": `${variant} conversion funnel`,
+      "data-vertical-transition": verticalData ? verticalTransition : void 0,
       style: { display: "block", height: "auto", minWidth: model.width > 900 ? model.width : void 0 },
       onPointerEnter: verticalData ? trackProximity : void 0,
       onPointerMove: verticalData ? trackProximity : void 0,
@@ -1170,11 +1173,24 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
         [data-proximity-active="true"] { cursor: pointer; }
         .atlas-vertical-hit:focus { outline: none; }
         [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-crossfade-duration, 150ms) ease; }
+        [data-vertical-transition="overlap"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity var(--atlas-crossfade-duration, 150ms) ease-out var(--atlas-overlap-delay, 50ms); }
+        [data-vertical-transition="overlap"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms, 0ms; }
+        [data-vertical-transition="relay"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity var(--atlas-relay-duration, 75ms) ease-in; }
+        [data-vertical-transition="relay"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms, var(--atlas-relay-duration, 75ms); }
+        [data-vertical-transition="overlap"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-crossfade-duration, 150ms) ease-out var(--atlas-overlap-delay, 50ms); }
+        [data-vertical-transition="overlap"][data-pointer-tracking="true"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms; }
+        [data-vertical-transition="relay"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-relay-duration, 75ms) ease-in; }
+        [data-vertical-transition="relay"][data-pointer-tracking="true"] .atlas-vertical-focus[data-visible] { transition-delay: var(--atlas-relay-duration, 75ms); }
+        [data-vertical-transition="none"] .atlas-vertical-stage, [data-vertical-transition="none"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 0ms; }
+        [data-vertical-transition="none"][data-pointer-tracking="true"] .atlas-vertical-stage, [data-vertical-transition="none"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity 0ms; }
         @media (prefers-reduced-motion: reduce) {
-          .atlas-vertical-stage, .atlas-vertical-focus, .atlas-vertical-annotation,
-          [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: none; }
+          [data-vertical-transition] .atlas-vertical-stage, [data-vertical-transition] .atlas-vertical-focus,
+          [data-vertical-transition] .atlas-vertical-focus[data-visible], [data-vertical-transition] .atlas-vertical-annotation,
+          [data-vertical-transition][data-pointer-tracking="true"] .atlas-vertical-stage,
+          [data-vertical-transition][data-pointer-tracking="true"] .atlas-vertical-focus { transition: none !important; }
         }
-        [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-focus, [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none; }
+        [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-focus,
+        [data-keyboard-motion="off"] .atlas-vertical-focus[data-visible], [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none !important; }
       ` }),
         /* @__PURE__ */ jsx2(
           StableScreenDefs,

@@ -8,6 +8,7 @@ import { ScreenDefs } from './ScreenDefs';
 export type { FunnelData, FunnelGraph, FunnelLink, FunnelNode, FunnelVariant, Inspection, Screen, Stage } from '../chart/model';
 
 export type VerticalView = 'flat' | 'isometric';
+export type VerticalTransition = 'crossfade' | 'overlap' | 'relay' | 'none';
 export type FunnelOptions = {
   texture?: 'mixed' | 'dense' | 'am' | 'hatch' | 'cross' | 'coarse';
   density?: number;
@@ -47,6 +48,7 @@ type SharedProps = HTMLAttributes<HTMLDivElement> & {
   onInspect?: (inspection: Inspection | null) => void;
   idPrefix?: string;
   viewBox?: string;
+  verticalTransition?: VerticalTransition;
   children?: ReactNode;
 };
 export type AtlasFunnelProps = SharedProps & (
@@ -92,6 +94,7 @@ function paintVerticalFocus(svg: SVGSVGElement, stages: readonly Stage[], key: s
     const zoom = 1.06 + .36 * (1 - ratio);
     group.style.transform = selected ? `scale(${1 + (zoom - 1) * strength})` : 'none';
     group.style.opacity = selected ? '1' : '0';
+    group.toggleAttribute('data-visible', selected);
   });
   svg.querySelectorAll<SVGGElement>('.atlas-vertical-annotation').forEach(group => {
     group.style.opacity = String(!strength || group.getAttribute('data-stage-annotation') === key ? 1 : 1 - .6 * strength);
@@ -180,7 +183,7 @@ function FadeDefs({ model, idPrefix }: { model: ChartModel; idPrefix: string }) 
 
 export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function AtlasFunnel({
   data, variant = 'continuous', options = emptyOptions, seed = 1234,
-  onInspect, idPrefix: suppliedPrefix, viewBox, children, style, ...rootProps
+  onInspect, idPrefix: suppliedPrefix, viewBox, verticalTransition = 'crossfade', children, style, ...rootProps
 }, ref) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new Error('Seed must be an integer between 0 and 4294967295.');
   const id = useId();
@@ -280,7 +283,8 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
   };
   return <div {...rootProps} ref={ref} style={{ display: 'block', ...style }}>
     <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={viewBox ?? `0 0 ${model.width} ${model.height}`} width="100%"
-      role="group" aria-label={`${variant} conversion funnel`} style={{ display: 'block', height: 'auto', minWidth: model.width > 900 ? model.width : undefined }}
+      role="group" aria-label={`${variant} conversion funnel`} data-vertical-transition={verticalData ? verticalTransition : undefined}
+      style={{ display: 'block', height: 'auto', minWidth: model.width > 900 ? model.width : undefined }}
       onPointerEnter={verticalData ? trackProximity : undefined} onPointerMove={verticalData ? trackProximity : undefined}
       onPointerLeave={verticalData ? leaveProximity : undefined}
       onPointerUp={verticalData ? event => { if (event.pointerType !== 'mouse' && !(event.target as Element).closest('[data-hit-stage]')) {
@@ -296,11 +300,24 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
         [data-proximity-active="true"] { cursor: pointer; }
         .atlas-vertical-hit:focus { outline: none; }
         [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-crossfade-duration, 150ms) ease; }
+        [data-vertical-transition="overlap"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity var(--atlas-crossfade-duration, 150ms) ease-out var(--atlas-overlap-delay, 50ms); }
+        [data-vertical-transition="overlap"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms, 0ms; }
+        [data-vertical-transition="relay"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity var(--atlas-relay-duration, 75ms) ease-in; }
+        [data-vertical-transition="relay"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms, var(--atlas-relay-duration, 75ms); }
+        [data-vertical-transition="overlap"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-crossfade-duration, 150ms) ease-out var(--atlas-overlap-delay, 50ms); }
+        [data-vertical-transition="overlap"][data-pointer-tracking="true"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms; }
+        [data-vertical-transition="relay"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-relay-duration, 75ms) ease-in; }
+        [data-vertical-transition="relay"][data-pointer-tracking="true"] .atlas-vertical-focus[data-visible] { transition-delay: var(--atlas-relay-duration, 75ms); }
+        [data-vertical-transition="none"] .atlas-vertical-stage, [data-vertical-transition="none"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 0ms; }
+        [data-vertical-transition="none"][data-pointer-tracking="true"] .atlas-vertical-stage, [data-vertical-transition="none"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity 0ms; }
         @media (prefers-reduced-motion: reduce) {
-          .atlas-vertical-stage, .atlas-vertical-focus, .atlas-vertical-annotation,
-          [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: none; }
+          [data-vertical-transition] .atlas-vertical-stage, [data-vertical-transition] .atlas-vertical-focus,
+          [data-vertical-transition] .atlas-vertical-focus[data-visible], [data-vertical-transition] .atlas-vertical-annotation,
+          [data-vertical-transition][data-pointer-tracking="true"] .atlas-vertical-stage,
+          [data-vertical-transition][data-pointer-tracking="true"] .atlas-vertical-focus { transition: none !important; }
         }
-        [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-focus, [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none; }
+        [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-focus,
+        [data-keyboard-motion="off"] .atlas-vertical-focus[data-visible], [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none !important; }
       `}</style>}
       <StableScreenDefs idPrefix={idPrefix} width={model.width} height={model.height} density={normalized.density}
         patternAngle={normalized.patternAngle} dotGain={normalized.dotGain} roughness={normalized.roughness}

@@ -179,6 +179,23 @@ assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, 
 assert.equal(svg.hasAttribute('data-proximity-active'), false);
 assert.equal(inspected.at(-1), 'finish');
 
+const transitionProps = { data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 } };
+const originalStageTransform = document.querySelector('#app [data-stage="entry"]').style.transform;
+const originalFocusTransform = document.querySelector('#app [data-stage-focus="finish"]').style.transform;
+await act(async () => root.render(createElement(AtlasFunnel, { ...transitionProps, verticalTransition: 'overlap' })));
+assert.equal(svg.getAttribute('data-vertical-transition'), 'overlap');
+assert.equal(document.querySelector('#app [data-stage="entry"]').style.transform, originalStageTransform);
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.transform, originalFocusTransform);
+await act(async () => root.render(createElement(AtlasFunnel, { ...transitionProps, verticalTransition: 'relay' })));
+assert.equal(document.querySelector('#app [data-stage="entry"]').style.transform, originalStageTransform);
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.transform, originalFocusTransform);
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').hasAttribute('data-visible'), true);
+await act(async () => root.render(createElement(AtlasFunnel, { ...transitionProps, verticalTransition: 'none' })));
+assert.equal(svg.getAttribute('data-vertical-transition'), 'none');
+assert.equal(document.querySelector('#app [data-stage="entry"]').style.transform, originalStageTransform);
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.transform, originalFocusTransform);
+assert.match(svg.querySelector('style').textContent, /\[data-vertical-transition="none"\].*opacity 0ms/);
+
 await act(async () => root.render(createElement('section', null,
   createElement(AtlasFunnel, { data: stages, options }),
   createElement(AtlasFunnel, { data: stages, options }),

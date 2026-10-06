@@ -2,6 +2,7 @@ import { type HTMLAttributes, type ReactNode } from 'react';
 import { type FunnelGraph, type Inspection, type Stage } from './model';
 export type { FunnelData, FunnelGraph, FunnelLink, FunnelNode, FunnelVariant, Inspection, Screen, Stage } from './model';
 export type VerticalView = 'flat' | 'isometric';
+export type VerticalTransition = 'crossfade' | 'overlap' | 'relay' | 'none';
 export type FunnelOptions = {
     texture?: 'mixed' | 'dense' | 'am' | 'hatch' | 'cross' | 'coarse';
     density?: number;
@@ -40,6 +41,7 @@ type SharedProps = HTMLAttributes<HTMLDivElement> & {
     onInspect?: (inspection: Inspection | null) => void;
     idPrefix?: string;
     viewBox?: string;
+    verticalTransition?: VerticalTransition;
     children?: ReactNode;
 };
 export type AtlasFunnelProps = SharedProps & ({

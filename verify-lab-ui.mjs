@@ -33,7 +33,9 @@ assert.match(document.querySelector('#figure-title').textContent, /Vertical funn
 assert.equal(document.querySelectorAll('#canvas .atlas-vertical-stage [data-stage-face]').length, 10);
 await waitFor(() => document.querySelector('[aria-label="Playback Speed"]'), 'DialKit speed control');
 assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribute('aria-valuenow'), '1');
+assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribute('aria-valuemin'), '0.1');
 assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-crossfade-duration'), '150ms');
+assert.equal(document.querySelector('#canvas svg')?.getAttribute('data-vertical-transition'), 'crossfade');
 const createObjectURL = URL.createObjectURL, revokeObjectURL = URL.revokeObjectURL;
 const anchorClick = dom.window.HTMLAnchorElement.prototype.click;
 let exported;
