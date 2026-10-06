@@ -14,7 +14,8 @@ const INK = '#2F4FE0';
 type Motion = {
   island: { enabled: boolean; lift: number; sideShift: number; cycle: number; stagger: number };
   flow: { enabled: boolean; fallTime: number; dotRate: number; dotSize: number };
-  hatch: { enabled: boolean; strokes: number; reach: number; weight: number; drawTime: number; hold: number; eraseTime: number; sideFace: boolean };
+  hatch: { enabled: boolean; strokes: number; reach: number; weight: number; drawTime: number; hold: number; eraseTime: number; sideFace: boolean;
+    directions: number; angleStep: number; jitter: number; mix: string };
   yieldToHover: boolean;
 };
 type Point = { x: number; y: number };
@@ -87,7 +88,14 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
     });
     // Hand-drawn shading: individual strokes appear at random near each front face's lower-right corner,
     // draw in, hold, then erase, so the shading is always present but never static.
-    const angle = (options.patternAngle ?? -45) * Math.PI / 180, hatchDirection = { x: Math.cos(angle), y: Math.sin(angle) };
+    const screenAngle = options.patternAngle ?? -45;
+    // Layered mix adds each further direction only closer to the corner, building tone the way hand cross-hatching does.
+    const strokeDirection = (h: Motion['hatch'], closeness: number) => {
+      const count = Math.max(1, Math.round(h.directions));
+      const allowed = h.mix === 'layered' ? 1 + [...Array(count - 1).keys()].filter(k => closeness > (k + 1) / count * .85).length : count;
+      const angle = (screenAngle + Math.floor(rand() * allowed) * h.angleStep + (rand() * 2 - 1) * h.jitter) * Math.PI / 180;
+      return { x: Math.cos(angle), y: Math.sin(angle) };
+    };
     const frontHeight = (group: SVGGElement, index: number) => {
       const front = points(group.querySelector(`[data-stage-front="${data[index].id}"]`)?.getAttribute('d') ?? null);
       return front[2].y - front[0].y;
@@ -109,6 +117,7 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
         const p = { x: target.corner.x + Math.cos(direction) * distance, y: target.corner.y + Math.sin(direction) * distance };
         const polygon = inside(target.front, p) ? target.front : h.sideFace && inside(target.side, p) ? target.side : null;
         if (!polygon) continue;
+        const hatchDirection = strokeDirection(h, 1 - distance / reach);
         const [low, high] = chord(polygon, p, hatchDirection);
         const length = Math.min(high - low, 2 + (reach * .8) * (1 - distance / reach) * (.5 + rand() * .5));
         const start = Math.max(low + .4, Math.min(-length / 2, high - .4 - length)), end = Math.min(high - .4, start + length);
@@ -231,6 +240,13 @@ function IdleMotion() {
       hold: [2.5, 0, 12, 0.1],
       eraseTime: [520, 60, 3000, 10],
       sideFace: false,
+      directions: [2, 1, 4, 1],
+      angleStep: [50, 5, 90, 1],
+      jitter: [6, 0, 30, 1],
+      mix: { type: 'select', options: [
+        { value: 'layered', label: 'Layered' },
+        { value: 'mixed', label: 'Mixed' },
+      ], default: 'layered' },
     },
     yieldToHover: true,
     reset: { type: 'action', label: 'Reset' },
