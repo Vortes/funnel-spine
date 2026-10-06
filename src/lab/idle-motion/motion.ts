@@ -8,7 +8,7 @@ export type IdleMotionValues = {
   island: { enabled: boolean; lift: number; sideShift: number; cycle: number; stagger: number };
   flow: { enabled: boolean; fallTime: number; dotRate: number; dotSize: number };
   hatch: { enabled: boolean; strokes: number; reach: number; weight: number; drawTime: number; hold: number; eraseTime: number; sideFace: boolean;
-    directions: number; angleStep: number; jitter: number; mix: string; style: string; stippleDensity: number; stippleSize: number; halftoneDensity: number };
+    directions: number; angleStep: number; jitter: number; mix: string; style: string; stippleDensity: number; stippleSize: number; halftoneDensity: number; halftoneDotSize: number };
   yieldToHover: boolean;
 };
 type Point = { x: number; y: number };
@@ -153,7 +153,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
           // Halftone style inks new dots on the AM grid, growing toward the corner like a halftone gradient.
           const size = halftoneSize, at = { x: (Math.floor(p.x / size) + .5) * size, y: (Math.floor(p.y / size) + .5) * size };
           if (!inside(polygon, at)) continue;
-          addDot(cornerIndex, now, h, at, 0, size * .52 * (.3 + .7 * closeness));
+          addDot(cornerIndex, now, h, at, 0, h.halftoneDotSize * (.3 + .7 * closeness));
           return;
         }
         if (h.style === 'match' && isStipple(screen)) {
@@ -162,16 +162,18 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
         }
         if (h.style !== 'lines' && isGrid(screen)) {
           const { size, radius } = screen;
+          // Halftone style scales every grid mark by its dot size; Match screen keeps the screen's own proportions.
+          const scale = h.style === 'halftone' ? h.halftoneDotSize / (halftoneSize * .52) : 1;
           if (radius < size * .45) {
             // Open halftone: swell the real grid dot toward touching its neighbours.
             const at = { x: (Math.floor(p.x / size) + .5) * size, y: (Math.floor(p.y / size) + .5) * size };
             if (!inside(polygon, at)) continue;
-            addDot(cornerIndex, now, h, at, radius, radius + (size * .52 - radius) * (.35 + .65 * closeness));
+            addDot(cornerIndex, now, h, at, radius, radius + Math.max(0, size * .52 * scale - radius) * (.35 + .65 * closeness));
           } else {
             // Closed halftone: dots already overlap, so ink the paper gap at the cell corner instead.
             const at = { x: Math.round(p.x / size) * size, y: Math.round(p.y / size) * size };
             if (!inside(polygon, at)) continue;
-            addDot(cornerIndex, now, h, at, 0, (size * Math.SQRT1_2 - radius + .3) * (.6 + .6 * closeness));
+            addDot(cornerIndex, now, h, at, 0, (size * Math.SQRT1_2 - radius + .3) * scale * (.6 + .6 * closeness));
           }
           return;
         }
@@ -318,6 +320,7 @@ export function useIdleMotionPanel(): RefObject<IdleMotionValues> {
         { value: 'lines', label: 'Lines' },
       ], default: 'halftone' },
       halftoneDensity: [2.5, 1, 8, 0.5],
+      halftoneDotSize: [1.55, 0.3, 4, 0.05],
       stippleDensity: [4, 1, 12, 0.5],
       stippleSize: [0.45, 0.2, 1.5, 0.05],
     },
