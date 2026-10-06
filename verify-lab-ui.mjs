@@ -94,4 +94,17 @@ assert.equal(document.querySelector('#pause').getAttribute('aria-pressed'), 'tru
 assert.equal(document.querySelector('#preview').dataset.paused, 'true');
 dom.window.close();
 
-console.log('Verified React lab views, mirrored geometry, branching inspection, data validation, particle rendering, and playback controls.');
+dom = browser('<div id="comparison-root"></div>');
+await import('./dist/lab/prism-comparison/comparison.js');
+await waitFor(() => document.querySelectorAll('.comparison-panel svg').length === 2, 'prism comparison');
+const [before, after] = document.querySelectorAll('.comparison-panel svg');
+assert.equal(before.getAttribute('data-comparison-motion'), 'before');
+assert.equal(after.hasAttribute('data-comparison-motion'), false);
+assert.equal(before.getAttribute('viewBox'), after.getAttribute('viewBox'));
+assert.deepEqual([...before.querySelectorAll('[data-stage]')].map(stage => stage.getAttribute('data-stage')),
+  [...after.querySelectorAll('[data-stage]')].map(stage => stage.getAttribute('data-stage')));
+assert.equal(document.querySelectorAll('.comparison-header span').length, 2);
+assert.equal(document.querySelector('button'), null, 'the comparison page contains no lab controls');
+dom.window.close();
+
+console.log('Verified React lab views, mirrored geometry, branching inspection, data validation, particle rendering, playback controls, and the standalone prism comparison.');

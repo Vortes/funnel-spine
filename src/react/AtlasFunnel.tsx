@@ -1,9 +1,10 @@
 'use client';
 
-import { forwardRef, memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { forwardRef, memo, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type HTMLAttributes, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { normalizeOptions } from '../../dist/lab/options.js';
 import { buildChartModel, type ChartMark, type ChartModel, type FunnelGraph, type FunnelVariant, type Inspection, type Stage } from '../chart/model';
 import { ScreenDefs } from './ScreenDefs';
+import { ComparisonMotionContext } from './comparison-context';
 
 export type { FunnelData, FunnelGraph, FunnelLink, FunnelNode, FunnelVariant, Inspection, Screen, Stage } from '../chart/model';
 
@@ -220,6 +221,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
   onInspect, idPrefix: suppliedPrefix, viewBox, verticalTransition = 'crossfade', children, style, ...rootProps
 }, ref) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new Error('Seed must be an integer between 0 and 4294967295.');
+  const comparisonBefore = useContext(ComparisonMotionContext) === 'before';
   const id = useId();
   const idPrefix = suppliedPrefix ?? `atlas-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const normalized = useMemo(() => normalizeOptions(
@@ -274,7 +276,8 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
     const nearby = proximityRef.current;
     const key = [focusKey, nearby.key, pinnedKey].find(item => item && inspections.has(item)) ?? null;
     const progress = focusKey || !nearby.key && pinnedKey ? 1 : nearby.progress;
-    paintVerticalFocus(svg, verticalData, key, progress, heldFocusRef.current, focusKey ? undefined : retainedFocusRef.current);
+    paintVerticalFocus(svg, verticalData, key, progress, heldFocusRef.current,
+      comparisonBefore || focusKey ? undefined : retainedFocusRef.current);
   }, [verticalData, model, focusKey, pinnedKey, hoverKey, inspections]);
   useEffect(() => () => {
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
@@ -342,31 +345,46 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
           .find(group => group.getAttribute('data-stage') === next.key);
         const focus = [...svg.querySelectorAll<SVGGElement>('.atlas-vertical-focus')]
           .find(group => group.getAttribute('data-stage-focus') === next.key);
-        const previousFocus = [...svg.querySelectorAll<SVGGElement>('.atlas-vertical-focus')]
-          .find(group => group.getAttribute('data-stage-focus') === outgoing);
-        if (previousFocus && Number(window.getComputedStyle(previousFocus).opacity) > .01) retainedFocusRef.current.add(outgoing);
-        if (stage && focus && Number(window.getComputedStyle(focus).opacity) < .01) {
-          const startingTransform = window.getComputedStyle(stage).transform;
-          const startingOpacity = window.getComputedStyle(stage).opacity;
-          stage.style.transition = 'none';
-          focus.style.transition = 'none';
-          focus.style.transform = startingTransform;
-          focus.style.opacity = startingOpacity;
-          stage.style.opacity = '0';
-          // Transfer the visible shape before either copy changes size.
-          window.getComputedStyle(focus).transform;
-          window.getComputedStyle(stage).opacity;
-          stage.style.removeProperty('transition');
-          focus.style.removeProperty('transition');
-          heldFocusRef.current = next.key;
-        } else heldFocusRef.current = null;
-        retainedFocusRef.current.add(next.key);
-        svg.setAttribute('data-switching', 'true');
-        // Establish transition styles and starting matrices for every moving copy.
-        svg.querySelectorAll<SVGGElement>('.atlas-vertical-stage, .atlas-vertical-focus').forEach(group => {
-          window.getComputedStyle(group).transform;
-        });
-        switchTimerRef.current = window.setTimeout(() => finishHandoff(svg), crossfadeDurationMs(svg) + 16);
+        if (comparisonBefore) {
+          if (stage && focus && Number(window.getComputedStyle(focus).opacity) < .01) {
+            focus.style.transition = 'none';
+            focus.style.transform = window.getComputedStyle(stage).transform;
+            focus.style.opacity = '0';
+            window.getComputedStyle(focus).transform;
+            focus.style.removeProperty('transition');
+            heldFocusRef.current = next.key;
+          } else heldFocusRef.current = null;
+          svg.setAttribute('data-switching', 'true');
+          window.getComputedStyle(stage ?? svg).transitionProperty;
+          switchTimerRef.current = window.setTimeout(() => {
+            svg.removeAttribute('data-switching');
+            switchTimerRef.current = null;
+          }, crossfadeDurationMs(svg) + 16);
+        } else {
+          const previousFocus = [...svg.querySelectorAll<SVGGElement>('.atlas-vertical-focus')]
+            .find(group => group.getAttribute('data-stage-focus') === outgoing);
+          if (previousFocus && Number(window.getComputedStyle(previousFocus).opacity) > .01) retainedFocusRef.current.add(outgoing);
+          if (stage && focus && Number(window.getComputedStyle(focus).opacity) < .01) {
+            const startingTransform = window.getComputedStyle(stage).transform;
+            const startingOpacity = window.getComputedStyle(stage).opacity;
+            stage.style.transition = 'none';
+            focus.style.transition = 'none';
+            focus.style.transform = startingTransform;
+            focus.style.opacity = startingOpacity;
+            stage.style.opacity = '0';
+            window.getComputedStyle(focus).transform;
+            window.getComputedStyle(stage).opacity;
+            stage.style.removeProperty('transition');
+            focus.style.removeProperty('transition');
+            heldFocusRef.current = next.key;
+          } else heldFocusRef.current = null;
+          retainedFocusRef.current.add(next.key);
+          svg.setAttribute('data-switching', 'true');
+          svg.querySelectorAll<SVGGElement>('.atlas-vertical-stage, .atlas-vertical-focus').forEach(group => {
+            window.getComputedStyle(group).transform;
+          });
+          switchTimerRef.current = window.setTimeout(() => finishHandoff(svg), crossfadeDurationMs(svg) + 16);
+        }
       }
       setHoverKey(next.key);
       onInspect?.(next.key ? inspections.get(next.key) ?? null : pinnedKey ? inspections.get(pinnedKey) ?? null : null);
@@ -376,7 +394,8 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
       const nearby = proximityRef.current;
       const key = nearby.key ?? (pinnedKey && inspections.has(pinnedKey) ? pinnedKey : null);
       heldFocusRef.current = null;
-      paintVerticalFocus(svg, verticalData, key, nearby.key ? nearby.progress : key ? 1 : 0, null, retainedFocusRef.current);
+      paintVerticalFocus(svg, verticalData, key, nearby.key ? nearby.progress : key ? 1 : 0,
+        null, comparisonBefore ? undefined : retainedFocusRef.current);
     });
   };
   const leaveProximity = (event: ReactPointerEvent<SVGSVGElement>) => {
@@ -405,6 +424,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
   return <div {...rootProps} ref={ref} style={{ display: 'block', ...style }}>
     <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" viewBox={viewBox ?? `0 0 ${model.width} ${model.height}`} width="100%"
       role="group" aria-label={`${variant} conversion funnel`} data-vertical-transition={verticalData ? verticalTransition : undefined}
+      data-comparison-motion={comparisonBefore ? 'before' : undefined}
       style={{ display: 'block', height: 'auto', minWidth: model.width > 900 ? model.width : undefined }}
       onPointerEnter={verticalData ? trackProximity : undefined} onPointerMove={verticalData ? trackProximity : undefined}
       onPointerLeave={verticalData ? leaveProximity : undefined}
@@ -423,6 +443,8 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
         .atlas-vertical-hit:focus { outline: none; }
         [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus,
         [data-pointer-tracking="true"] .atlas-vertical-annotation { transition: none; }
+        [data-comparison-motion="before"][data-pointer-tracking="true"] .atlas-vertical-stage,
+        [data-comparison-motion="before"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-crossfade-duration, 150ms) ease; }
         [data-vertical-transition="overlap"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity var(--atlas-crossfade-duration, 150ms) ease-out var(--atlas-overlap-delay, 50ms); }
         [data-vertical-transition="overlap"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms, 0ms; }
         [data-vertical-transition="relay"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity var(--atlas-relay-duration, 75ms) ease-in; }
@@ -460,7 +482,7 @@ export const AtlasFunnel = forwardRef<HTMLDivElement, AtlasFunnelProps>(function
         })}
         {verticalStages.map(({ stage, index, marks, front }) => <g key={`focus:${stage.id}`}
           className="atlas-vertical-focus" data-stage-focus={stage.id} data-stage-index={index} aria-hidden="true" pointerEvents="none"
-          style={{ transformOrigin: front?.type === 'path' && front.focus
+          style={{ opacity: comparisonBefore ? 0 : undefined, transformOrigin: front?.type === 'path' && front.focus
             ? `${front.focus.x}px ${front.focus.y}px` : undefined }}>
           {marks.map(mark => <Mark key={mark.key} mark={mark} idPrefix={idPrefix}
             activeKey={activeKey} visibleKeys={null} roughness={normalized.roughness ?? .15}
