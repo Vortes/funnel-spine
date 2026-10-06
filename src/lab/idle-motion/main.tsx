@@ -15,13 +15,15 @@ type Motion = {
   island: { enabled: boolean; lift: number; sideShift: number; cycle: number; stagger: number };
   flow: { enabled: boolean; fallTime: number; dotRate: number; dotSize: number };
   hatch: { enabled: boolean; strokes: number; reach: number; weight: number; drawTime: number; hold: number; eraseTime: number; sideFace: boolean;
-    directions: number; angleStep: number; jitter: number; mix: string };
+    directions: number; angleStep: number; jitter: number; mix: string; matchScreen: boolean; stippleDensity: number; stippleSize: number };
   yieldToHover: boolean;
 };
 type Point = { x: number; y: number };
 type Gap = { group: SVGGElement; clip: SVGRectElement; bottom: number; x0: number; x1: number; depth: Point; landFront: number; rate: number; carry: number };
-type Corner = { group: SVGGElement; corner: Point; front: Point[]; side: Point[]; scale: number; carry: number };
-type Stroke = { node: SVGPathElement; corner: number; born: number; draw: number; hold: number; erase: number };
+type Screen = { type: string; size: number; radius: number };
+type Corner = { group: SVGGElement; corner: Point; front: Point[]; side: Point[]; frontScreen: Screen; sideScreen: Screen; scale: number; carry: number };
+// Lines draw along their length; dots swell from one radius to another.
+type HandMark = { node: SVGElement; kind: 'line' | 'dot'; corner: number; born: number; draw: number; hold: number; erase: number; from: number; to: number };
 type Dot = { node: SVGCircleElement; gap: number; x: number; from: number; to: number; born: number; fall: number };
 
 const points = (d: string | null) => {
@@ -90,36 +92,75 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
     // draw in, hold, then erase, so the shading is always present but never static.
     const screenAngle = options.patternAngle ?? -45;
     // Layered mix adds each further direction only closer to the corner, building tone the way hand cross-hatching does.
-    const strokeDirection = (h: Motion['hatch'], closeness: number) => {
-      const count = Math.max(1, Math.round(h.directions));
+    const strokeDirection = (h: Motion['hatch'], closeness: number, cross: boolean) => {
+      const count = cross ? Math.max(2, Math.round(h.directions)) : Math.max(1, Math.round(h.directions)), step = cross ? 90 : h.angleStep;
       const allowed = h.mix === 'layered' ? 1 + [...Array(count - 1).keys()].filter(k => closeness > (k + 1) / count * .85).length : count;
-      const angle = (screenAngle + Math.floor(rand() * allowed) * h.angleStep + (rand() * 2 - 1) * h.jitter) * Math.PI / 180;
+      const angle = (screenAngle + Math.floor(rand() * allowed) * step + (rand() * 2 - 1) * h.jitter) * Math.PI / 180;
       return { x: Math.cos(angle), y: Math.sin(angle) };
     };
     const frontHeight = (group: SVGGElement, index: number) => {
       const front = points(group.querySelector(`[data-stage-front="${data[index].id}"]`)?.getAttribute('d') ?? null);
       return front[2].y - front[0].y;
     };
+    // Each face's screen is read from its pattern fill, so hand marks sit on the real grid pitch and dot radius.
+    const screenOf = (face: Element | null): Screen => {
+      const id = /url\(#([^)]+)\)/.exec(face?.getAttribute('fill') ?? '')?.[1] ?? '';
+      const pattern = id ? svg.querySelector(`pattern[id="${id}"]`) : null;
+      return { type: id.slice(id.lastIndexOf('-') + 1), size: Number(pattern?.getAttribute('width') ?? 3),
+        radius: Number(pattern?.querySelector('circle')?.getAttribute('r') ?? 0) };
+    };
     const corners: Corner[] = stages.map((stage, index) => {
-      const front = points(stage.querySelector(`[data-stage-front="${data[index].id}"]`)?.getAttribute('d') ?? null);
-      const side = points(stage.querySelector('[data-face="side"]')?.getAttribute('d') ?? null);
+      const frontFace = stage.querySelector(`[data-stage-front="${data[index].id}"]`), sideFace = stage.querySelector('[data-face="side"]');
+      const front = points(frontFace?.getAttribute('d') ?? null), side = points(sideFace?.getAttribute('d') ?? null);
       const group = document.createElementNS(SVG, 'g');
       group.setAttribute('pointer-events', 'none');
       group.dataset.idleHatch = String(index);
       stage.insertBefore(group, stage.querySelector('[data-stage-outline]'));
-      return { group, corner: front[2], front, side, scale: frontHeight(stage, index) / frontHeight(stages[0], 0), carry: 0 };
+      return { group, corner: front[2], front, side, frontScreen: screenOf(frontFace), sideScreen: screenOf(sideFace),
+        scale: frontHeight(stage, index) / frontHeight(stages[0], 0), carry: 0 };
     });
-    const strokes: Stroke[] = [];
-    const spawnStroke = (cornerIndex: number, now: number, h: Motion['hatch']) => {
+    const marks: HandMark[] = [];
+    const isStipple = (screen: Screen) => screen.type === 'dense' || screen.type === 'sparse';
+    const isGrid = (screen: Screen) => screen.type === 'am' || screen.type === 'coarse';
+    const timing = (h: Motion['hatch'], drawScale = 1) => ({ draw: h.drawTime * drawScale * (.7 + rand() * .6),
+      hold: h.hold * 1000 * (.5 + rand()), erase: h.eraseTime * (.7 + rand() * .6) });
+    const addDot = (cornerIndex: number, now: number, h: Motion['hatch'], at: Point, from: number, to: number) => {
+      const node = document.createElementNS(SVG, 'circle');
+      node.setAttribute('cx', at.x.toFixed(2)); node.setAttribute('cy', at.y.toFixed(2)); node.setAttribute('r', '0');
+      node.setAttribute('fill', INK);
+      corners[cornerIndex].group.append(node);
+      marks.push({ node, kind: 'dot', corner: cornerIndex, born: now, from, to, ...timing(h, .5) });
+    };
+    const spawnMark = (cornerIndex: number, now: number, h: Motion['hatch']) => {
       const target = corners[cornerIndex], reach = h.reach * target.scale;
       for (let attempt = 0; attempt < 12; attempt++) {
         const distance = reach * rand() ** 1.6, direction = Math.PI * (1 + rand() * (h.sideFace ? 1 : .5));
         const p = { x: target.corner.x + Math.cos(direction) * distance, y: target.corner.y + Math.sin(direction) * distance };
         const polygon = inside(target.front, p) ? target.front : h.sideFace && inside(target.side, p) ? target.side : null;
         if (!polygon) continue;
-        const hatchDirection = strokeDirection(h, 1 - distance / reach);
+        const closeness = 1 - distance / reach, screen = polygon === target.front ? target.frontScreen : target.sideScreen;
+        if (h.matchScreen && isStipple(screen)) {
+          addDot(cornerIndex, now, h, p, 0, h.stippleSize * (.75 + rand() * .5));
+          return;
+        }
+        if (h.matchScreen && isGrid(screen)) {
+          const { size, radius } = screen;
+          if (radius < size * .45) {
+            // Open halftone: swell the real grid dot toward touching its neighbours.
+            const at = { x: (Math.floor(p.x / size) + .5) * size, y: (Math.floor(p.y / size) + .5) * size };
+            if (!inside(polygon, at)) continue;
+            addDot(cornerIndex, now, h, at, radius, radius + (size * .52 - radius) * (.35 + .65 * closeness));
+          } else {
+            // Closed halftone: dots already overlap, so ink the paper gap at the cell corner instead.
+            const at = { x: Math.round(p.x / size) * size, y: Math.round(p.y / size) * size };
+            if (!inside(polygon, at)) continue;
+            addDot(cornerIndex, now, h, at, 0, (size * Math.SQRT1_2 - radius + .3) * (.6 + .6 * closeness));
+          }
+          return;
+        }
+        const hatchDirection = strokeDirection(h, closeness, h.matchScreen && screen.type === 'cross');
         const [low, high] = chord(polygon, p, hatchDirection);
-        const length = Math.min(high - low, 2 + (reach * .8) * (1 - distance / reach) * (.5 + rand() * .5));
+        const length = Math.min(high - low, 2 + (reach * .8) * closeness * (.5 + rand() * .5));
         const start = Math.max(low + .4, Math.min(-length / 2, high - .4 - length)), end = Math.min(high - .4, start + length);
         if (end - start < 1.5) continue;
         const [a, b] = rand() < .5 ? [start, end] : [end, start];
@@ -129,8 +170,7 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
         node.setAttribute('fill', 'none'); node.setAttribute('stroke', INK); node.setAttribute('stroke-linecap', 'round');
         node.setAttribute('stroke-dasharray', '0 2');
         target.group.append(node);
-        strokes.push({ node, corner: cornerIndex, born: now, draw: h.drawTime * (.7 + rand() * .6),
-          hold: h.hold * 1000 * (.5 + rand()), erase: h.eraseTime * (.7 + rand() * .6) });
+        marks.push({ node, kind: 'line', corner: cornerIndex, born: now, from: 0, to: 1, ...timing(h) });
         return;
       }
     };
@@ -164,18 +204,23 @@ function useIdleMotion(root: React.RefObject<HTMLDivElement | null>, motion: Rea
       corners.forEach((corner, index) => {
         corner.group.setAttribute('opacity', Math.min(1, intensity * 1.5).toFixed(3));
         if (!hatch.enabled || intensity < .5) { corner.carry = 0; return; }
-        const wanted = hatch.strokes * corner.scale, live = strokes.filter(stroke => stroke.corner === index).length;
+        const density = hatch.matchScreen && isStipple(corner.frontScreen) ? hatch.stippleDensity : 1;
+        const wanted = hatch.strokes * corner.scale * density, live = marks.filter(mark => mark.corner === index).length;
         corner.carry += wanted / (life / 1000) * dt;
-        while (corner.carry >= 1) { corner.carry -= 1; if (live < wanted * 1.3) spawnStroke(index, now, hatch); }
+        while (corner.carry >= 1) { corner.carry -= 1; if (live < wanted * 1.3) spawnMark(index, now, hatch); }
       });
       const ease = (t: number) => 1 - (1 - t) ** 3;
-      for (let index = strokes.length - 1; index >= 0; index--) {
-        const stroke = strokes[index], age = now - stroke.born;
-        const drawn = ease(Math.min(1, age / stroke.draw));
-        const erased = ease(Math.max(0, Math.min(1, (age - stroke.draw - stroke.hold) / stroke.erase)));
-        if (erased >= 1 || (!hatch.enabled && intensity < .02)) { stroke.node.remove(); strokes.splice(index, 1); continue; }
-        stroke.node.setAttribute('stroke-dasharray', `0 ${erased.toFixed(4)} ${Math.max(0, drawn - erased).toFixed(4)} 2`);
-        stroke.node.setAttribute('stroke-width', String(hatch.weight));
+      for (let index = marks.length - 1; index >= 0; index--) {
+        const mark = marks[index], age = now - mark.born;
+        const drawn = ease(Math.min(1, age / mark.draw));
+        const erased = ease(Math.max(0, Math.min(1, (age - mark.draw - mark.hold) / mark.erase)));
+        if (erased >= 1 || (!hatch.enabled && intensity < .02)) { mark.node.remove(); marks.splice(index, 1); continue; }
+        if (mark.kind === 'line') {
+          mark.node.setAttribute('stroke-dasharray', `0 ${erased.toFixed(4)} ${Math.max(0, drawn - erased).toFixed(4)} 2`);
+          mark.node.setAttribute('stroke-width', String(hatch.weight));
+        } else {
+          mark.node.setAttribute('r', (mark.from + (mark.to - mark.from) * drawn * (1 - erased)).toFixed(3));
+        }
       }
       gaps.forEach((gap, index) => {
         gap.clip.setAttribute('y', String(gap.bottom + offsets[index].y - offsets[index + 1].y));
@@ -247,6 +292,9 @@ function IdleMotion() {
         { value: 'layered', label: 'Layered' },
         { value: 'mixed', label: 'Mixed' },
       ], default: 'layered' },
+      matchScreen: true,
+      stippleDensity: [4, 1, 12, 0.5],
+      stippleSize: [0.45, 0.2, 1.5, 0.05],
     },
     yieldToHover: true,
     reset: { type: 'action', label: 'Reset' },
