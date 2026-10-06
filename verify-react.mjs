@@ -99,18 +99,19 @@ await act(async () => root.render(createElement(AtlasFunnel, {
   onInspect: info => inspected.push(info?.key ?? null),
 })));
 await act(async () => document.querySelector('#app [data-key="entry"]').dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
-const faces = [...document.querySelectorAll('#app [data-stage-face]')];
+const faces = [...document.querySelectorAll('#app .atlas-vertical-stage [data-stage-face]')];
 assert.equal(faces.length, 4);
 assert(faces.every(face => face.getAttribute('fill') === face.getAttribute('data-base-fill')));
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.28');
-assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, '1');
-assert.match(document.querySelector('#app [data-stage="entry"]').style.transform, /^scale\(/);
-assert.match(document.querySelector('#app [data-stage="entry"]').style.transformOrigin, /^\d+(?:\.\d+)?px \d+(?:\.\d+)?px$/);
+assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, '0');
+assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '1');
+assert.match(document.querySelector('#app [data-stage-focus="entry"]').style.transform, /^scale\(/);
+assert.match(document.querySelector('#app [data-stage-focus="entry"]').style.transformOrigin, /^\d+(?:\.\d+)?px \d+(?:\.\d+)?px$/);
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.transform, 'translateY(22px) scale(0.98)');
 assert.equal(document.querySelector('#app [data-stage-front="finish"]').getAttribute('fill'),
   document.querySelector('#app [data-stage-front="finish"]').getAttribute('data-base-fill'));
-assert.equal(document.querySelector('#app [data-stage="entry"]'),
-  [...document.querySelectorAll('#app .atlas-vertical-stage')].at(-1), 'focused stage is drawn in front');
+assert.deepEqual([...document.querySelectorAll('#app .atlas-vertical-stage')].map(group => group.dataset.stage), ['entry', 'finish']);
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '0');
 assert.equal(document.querySelector('#app [data-keyboard-motion]').dataset.keyboardMotion, 'off');
 await act(async () => document.querySelector('#app [data-key="entry"]').dispatchEvent(new dom.window.FocusEvent('focusout', { bubbles: true })));
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1');
@@ -132,13 +133,21 @@ const movePointer = async (x, y) => {
 await movePointer(250, 140);
 assert.equal(inspected.at(-1), 'entry', 'inspection begins before the cursor reaches the stage');
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.64');
-const halfScale = Number(document.querySelector('#app [data-stage="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
+assert.equal(svg.getAttribute('data-proximity-active'), 'true');
+const halfScale = Number(document.querySelector('#app [data-stage-focus="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
 await movePointer(210, 140);
-const nearScale = Number(document.querySelector('#app [data-stage="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
+const nearScale = Number(document.querySelector('#app [data-stage-focus="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
 assert(nearScale > halfScale, 'focus grows as the cursor approaches');
+await movePointer(150, 330);
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '1');
+assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '0');
+assert.deepEqual([...document.querySelectorAll('#app .atlas-vertical-stage')].map(group => group.dataset.stage), ['entry', 'finish'], 'stage DOM order stays fixed when switching rapidly');
+await movePointer(150, 140);
+assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '1');
 await movePointer(500, 140);
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1');
 assert.equal(inspected.at(-1), null);
+assert.equal(svg.hasAttribute('data-proximity-active'), false);
 await act(async () => root.render(createElement(AtlasFunnel, {
   data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65, proximityRadius: 0 },
   onInspect: info => inspected.push(info?.key ?? null),
@@ -146,14 +155,17 @@ await act(async () => root.render(createElement(AtlasFunnel, {
 assert.equal(document.querySelector('#app svg'), svg);
 await movePointer(250, 140);
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1', 'zero radius requires direct hover');
+assert.equal(svg.hasAttribute('data-proximity-active'), false);
 await movePointer(150, 140);
 assert.equal(inspected.at(-1), 'entry');
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.28');
+assert.equal(svg.getAttribute('data-proximity-active'), 'true');
 const touch = new dom.window.Event('pointerup', { bubbles: true });
 Object.defineProperty(touch, 'pointerType', { value: 'touch' });
 await act(async () => document.querySelector('#app [data-key="finish"]').dispatchEvent(touch));
 assert.equal(document.querySelector('#app [data-key="finish"]').getAttribute('aria-pressed'), 'true');
 assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, '0.28');
+assert.equal(svg.hasAttribute('data-proximity-active'), false);
 assert.equal(inspected.at(-1), 'finish');
 
 await act(async () => root.render(createElement('section', null,

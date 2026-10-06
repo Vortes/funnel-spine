@@ -44,6 +44,7 @@ function FunnelCanvas({ config, introToken, onInspect, onPathsChange, onRenderEr
     svg.classList.add('chart-intro', `chart-intro--${config.variant}`);
     const steps = new Map([...svg.querySelectorAll<SVGElement>('[data-key]')].map((mark, index) => [mark.dataset.key, index]));
     svg.querySelectorAll<SVGElement>('[data-stage-front],[data-stage-face],[data-stage-outline]').forEach(mark => {
+      if (mark.closest('[data-stage-focus]')) return;
       mark.classList.add('print-mark');
       const key = mark.getAttribute('data-stage-front') ?? mark.getAttribute('data-stage-face') ?? mark.getAttribute('data-stage-outline');
       mark.style.setProperty('--print-step', String(steps.get(key ?? '') ?? 0));

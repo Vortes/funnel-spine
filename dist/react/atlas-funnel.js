@@ -894,10 +894,16 @@ function paintVerticalFocus(svg, stages, key, progress) {
   svg.querySelectorAll(".atlas-vertical-stage").forEach((group) => {
     const index = Number(group.getAttribute("data-stage-index"));
     const selected = index === selectedIndex;
+    group.style.transform = !strength || selected ? "none" : `translateY(${(index < selectedIndex ? -22 : 22) * strength}px) scale(${1 - 0.02 * strength})`;
+    group.style.opacity = String(!strength ? 1 : selected ? 0 : 1 - 0.72 * strength);
+  });
+  svg.querySelectorAll(".atlas-vertical-focus").forEach((group) => {
+    const index = Number(group.getAttribute("data-stage-index"));
+    const selected = index === selectedIndex && strength > 0;
     const ratio = stages[index].value / (stages[0]?.value || 1);
     const zoom = 1.06 + 0.36 * (1 - ratio);
-    group.style.transform = selected ? `scale(${1 + (zoom - 1) * strength})` : strength ? `translateY(${(index < selectedIndex ? -22 : 22) * strength}px) scale(${1 - 0.02 * strength})` : "none";
-    group.style.opacity = String(selected || !strength ? 1 : 1 - 0.72 * strength);
+    group.style.transform = selected ? `scale(${1 + (zoom - 1) * strength})` : "none";
+    group.style.opacity = selected ? "1" : "0";
   });
   svg.querySelectorAll(".atlas-vertical-annotation").forEach((group) => {
     group.style.opacity = String(!strength || group.getAttribute("data-stage-annotation") === key ? 1 : 1 - 0.6 * strength);
@@ -1075,7 +1081,6 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
       annotations: model.marks.filter((mark) => mark.type !== "path" && annotationKeys.has(mark.key))
     };
   }) ?? [];
-  const orderedStages = selectedIndex < 0 ? verticalStages : [...verticalStages.filter((item) => item.index !== selectedIndex), verticalStages[selectedIndex]];
   useLayoutEffect(() => {
     const svg = svgRef.current;
     if (!svg || !verticalData) return;
@@ -1105,6 +1110,8 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
     proximityRef.current = next;
     setKeyboardMotion(false);
     svg.setAttribute("data-pointer-tracking", "true");
+    if (next.key) svg.setAttribute("data-proximity-active", "true");
+    else svg.removeAttribute("data-proximity-active");
     if (previous !== next.key) {
       setHoverKey(next.key);
       onInspect?.(next.key ? inspections.get(next.key) ?? null : pinnedKey ? inspections.get(pinnedKey) ?? null : null);
@@ -1122,6 +1129,7 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
     proximityRef.current = { key: null, progress: 0 };
     stopFrame();
     svg?.removeAttribute("data-pointer-tracking");
+    svg?.removeAttribute("data-proximity-active");
     setHoverKey(null);
     const key = focusKey ?? pinnedKey;
     if (svg) paintVerticalFocus(svg, verticalData, key, key ? 1 : 0);
@@ -1149,19 +1157,21 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
           stopFrame();
           proximityRef.current = { key: null, progress: 0 };
           svgRef.current?.removeAttribute("data-pointer-tracking");
+          svgRef.current?.removeAttribute("data-proximity-active");
           setHoverKey(null);
           clearPinned();
         }
       } : void 0,
       children: [
         verticalData && /* @__PURE__ */ jsx2("style", { children: `
-        .atlas-vertical-stage { transform-box: view-box; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
+        .atlas-vertical-stage, .atlas-vertical-focus { transform-box: view-box; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
         .atlas-vertical-annotation { transition: opacity 150ms ease; }
         .atlas-vertical-hit { cursor: pointer; }
+        [data-proximity-active="true"] { cursor: pointer; }
         .atlas-vertical-hit:focus { outline: none; }
-        [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-annotation { transition: none; }
-        @media (prefers-reduced-motion: reduce) { .atlas-vertical-stage, .atlas-vertical-annotation { transition: none; } }
-        [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none; }
+        [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus, [data-pointer-tracking="true"] .atlas-vertical-annotation { transition: none; }
+        @media (prefers-reduced-motion: reduce) { .atlas-vertical-stage, .atlas-vertical-focus, .atlas-vertical-annotation { transition: none; } }
+        [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-focus, [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none; }
       ` }),
         /* @__PURE__ */ jsx2(
           StableScreenDefs,
@@ -1181,8 +1191,8 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
         /* @__PURE__ */ jsx2(FadeDefs, { model, idPrefix }),
         /* @__PURE__ */ jsx2("rect", { width: model.width, height: model.height, fill: normalized.paperGrain ? `url(#${idPrefix}-grain)` : PAPER2 }),
         verticalData ? /* @__PURE__ */ jsxs2("g", { "data-keyboard-motion": keyboardMotion ? "off" : void 0, children: [
-          orderedStages.map(({ stage, index, marks, front }) => {
-            return /* @__PURE__ */ jsxs2(
+          verticalStages.map(({ stage, index, marks, front }) => {
+            return /* @__PURE__ */ jsx2(
               "g",
               {
                 className: "atlas-vertical-stage",
@@ -1190,37 +1200,63 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
                 "data-stage-index": index,
                 "data-active": index === selectedIndex || void 0,
                 style: { transformOrigin: front?.type === "path" && front.focus ? `${front.focus.x}px ${front.focus.y}px` : void 0 },
-                children: [
-                  marks.map((mark) => /* @__PURE__ */ jsx2(
-                    Mark,
-                    {
-                      mark,
-                      idPrefix,
-                      activeKey,
-                      visibleKeys: null,
-                      roughness: normalized.roughness ?? 0.15,
-                      onPreview: preview,
-                      onLeave: leave,
-                      verticalStage: true
-                    },
-                    mark.key
-                  )),
-                  focusKey === stage.id && front?.type === "path" && /* @__PURE__ */ jsx2(
-                    "path",
-                    {
-                      d: front.d,
-                      fill: "none",
-                      stroke: INK2,
-                      strokeWidth: 2,
-                      pointerEvents: "none",
-                      "data-focus-outline": ""
-                    }
-                  )
-                ]
+                children: marks.map((mark) => /* @__PURE__ */ jsx2(
+                  Mark,
+                  {
+                    mark,
+                    idPrefix,
+                    activeKey,
+                    visibleKeys: null,
+                    roughness: normalized.roughness ?? 0.15,
+                    onPreview: preview,
+                    onLeave: leave,
+                    verticalStage: true
+                  },
+                  mark.key
+                ))
               },
               stage.id
             );
           }),
+          verticalStages.map(({ stage, index, marks, front }) => /* @__PURE__ */ jsxs2(
+            "g",
+            {
+              className: "atlas-vertical-focus",
+              "data-stage-focus": stage.id,
+              "data-stage-index": index,
+              "aria-hidden": "true",
+              pointerEvents: "none",
+              style: { opacity: 0, transformOrigin: front?.type === "path" && front.focus ? `${front.focus.x}px ${front.focus.y}px` : void 0 },
+              children: [
+                marks.map((mark) => /* @__PURE__ */ jsx2(
+                  Mark,
+                  {
+                    mark,
+                    idPrefix,
+                    activeKey,
+                    visibleKeys: null,
+                    roughness: normalized.roughness ?? 0.15,
+                    onPreview: preview,
+                    onLeave: leave,
+                    verticalStage: true
+                  },
+                  mark.key
+                )),
+                focusKey === stage.id && front?.type === "path" && /* @__PURE__ */ jsx2(
+                  "path",
+                  {
+                    d: front.d,
+                    fill: "none",
+                    stroke: INK2,
+                    strokeWidth: 2,
+                    pointerEvents: "none",
+                    "data-focus-outline": ""
+                  }
+                )
+              ]
+            },
+            `focus:${stage.id}`
+          )),
           verticalStages.map(({ stage, annotations }) => /* @__PURE__ */ jsx2(
             "g",
             {
@@ -1262,6 +1298,7 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
                     stopFrame();
                     proximityRef.current = { key: null, progress: 0 };
                     svgRef.current?.removeAttribute("data-pointer-tracking");
+                    svgRef.current?.removeAttribute("data-proximity-active");
                     setHoverKey(null);
                     setKeyboardMotion(false);
                     const next = pinnedKey === info.key ? null : info.key;

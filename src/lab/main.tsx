@@ -148,6 +148,7 @@ function App() {
       path.removeAttribute('role');
     });
     clone.querySelectorAll('[data-hit-stage]').forEach(path => path.remove());
+    clone.querySelectorAll('[data-stage-focus]').forEach(path => path.remove());
     clone.querySelectorAll('[data-focus-outline]').forEach(path => path.remove());
     clone.querySelectorAll<SVGElement>('.atlas-vertical-stage,.atlas-vertical-annotation').forEach(group => {
       group.style.removeProperty('transform');
@@ -157,6 +158,7 @@ function App() {
     });
     clone.querySelectorAll('[data-keyboard-motion]').forEach(group => group.removeAttribute('data-keyboard-motion'));
     clone.removeAttribute('data-pointer-tracking');
+    clone.removeAttribute('data-proximity-active');
     clone.querySelectorAll('.print-mark').forEach(mark => { mark.classList.remove('print-mark'); (mark as SVGElement).style.removeProperty('--print-step'); });
     clone.removeAttribute('xmlns');
     clone.setAttribute('width', clone.getAttribute('viewBox')!.split(' ')[2]);
