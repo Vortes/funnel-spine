@@ -42,10 +42,10 @@ function FunnelCanvas({ config, introToken, onInspect, onPathsChange, onRenderEr
       return;
     }
     svg.classList.add('chart-intro', `chart-intro--${config.variant}`);
-    const steps = new Map([...svg.querySelectorAll<SVGPathElement>('path[data-key]')].map((path, index) => [path.dataset.key, index]));
-    svg.querySelectorAll<SVGElement>('path[data-key],[data-stage-face],[data-stage-outline]').forEach(mark => {
+    const steps = new Map([...svg.querySelectorAll<SVGElement>('[data-key]')].map((mark, index) => [mark.dataset.key, index]));
+    svg.querySelectorAll<SVGElement>('[data-stage-front],[data-stage-face],[data-stage-outline]').forEach(mark => {
       mark.classList.add('print-mark');
-      const key = mark.getAttribute('data-key') ?? mark.getAttribute('data-stage-face') ?? mark.getAttribute('data-stage-outline');
+      const key = mark.getAttribute('data-stage-front') ?? mark.getAttribute('data-stage-face') ?? mark.getAttribute('data-stage-outline');
       mark.style.setProperty('--print-step', String(steps.get(key ?? '') ?? 0));
     });
   }, [introToken, config, svgRef]);
@@ -87,7 +87,7 @@ export function FigurePanel({ config, introToken, inspected, infos, error, svgRe
     <div className="ink-spec"><span className="ink-mark" aria-hidden="true" /><span>BLUE 01 <b>#2F4FE0</b></span><span>COOL GRAY STOCK <b>#E4E5E8</b></span><span>ONE SPOT INK</span></div>
     <FunnelCanvas config={config} introToken={introToken} onInspect={onInspect} onPathsChange={onPathsChange} onRenderError={onRenderError} svgRef={svgRef} />
     <ScreenLegend options={config.options} seed={config.seed} />
-    <div className="caption"><span id="figure-caption">{caption}</span><span>Hover or focus to inspect</span></div>
+    <div className="caption"><span id="figure-caption">{caption}</span><span>{config.variant === 'vertical' ? 'Hover, tap, or focus to inspect' : 'Hover or focus to inspect'}</span></div>
     <div className="inspector" aria-live="polite"><div><span id="inspect-state">PATH INSPECTOR</span><strong id="inspect-path">{active?.label ?? 'Explore a ribbon'}</strong></div>
       <div><span>Quantity</span><strong id="inspect-value">{active ? format(active.value) : '—'}</strong></div>
       <div><span>Conversion</span><strong id="inspect-conversion">{active ? percent(active.value, active.denominator) : '—'}</strong></div>

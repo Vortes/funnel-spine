@@ -147,7 +147,16 @@ function App() {
       path.removeAttribute('tabindex');
       path.removeAttribute('role');
     });
+    clone.querySelectorAll('[data-hit-stage]').forEach(path => path.remove());
+    clone.querySelectorAll('[data-focus-outline]').forEach(path => path.remove());
+    clone.querySelectorAll<SVGElement>('.atlas-vertical-stage,.atlas-vertical-annotation').forEach(group => {
+      group.style.removeProperty('transform');
+      group.style.removeProperty('opacity');
+      group.removeAttribute('data-active');
+    });
+    clone.querySelectorAll('[data-keyboard-motion]').forEach(group => group.removeAttribute('data-keyboard-motion'));
     clone.querySelectorAll('.print-mark').forEach(mark => { mark.classList.remove('print-mark'); (mark as SVGElement).style.removeProperty('--print-step'); });
+    clone.removeAttribute('xmlns');
     clone.setAttribute('width', clone.getAttribute('viewBox')!.split(' ')[2]);
     clone.setAttribute('height', clone.getAttribute('viewBox')!.split(' ')[3]);
     download(new XMLSerializer().serializeToString(clone), `atlas-lab-${variant}.svg`, 'image/svg+xml');

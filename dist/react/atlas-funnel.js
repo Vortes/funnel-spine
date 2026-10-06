@@ -855,7 +855,7 @@ function connectedLinks(model, key) {
   walk(active.inspection.target, false);
   return linked;
 }
-function Mark({ mark, idPrefix, activeKey, visibleKeys, roughness, onPreview, onLeave }) {
+function Mark({ mark, idPrefix, activeKey, visibleKeys, roughness, onPreview, onLeave, verticalStage = false }) {
   if (mark.type === "line") return /* @__PURE__ */ jsx2(
     "line",
     {
@@ -896,7 +896,7 @@ function Mark({ mark, idPrefix, activeKey, visibleKeys, roughness, onPreview, on
   const baseFill = mark.fill === "none" ? "none" : mark.pattern === "paper" ? PAPER2 : `url(#${idPrefix}-${mark.pattern ?? "solid"})`;
   const inspection = mark.inspection;
   const visible = !activeKey || (inspection ? visibleKeys ? visibleKeys.has(inspection.key) : activeKey === inspection.key : mark.stageId ? activeKey === mark.stageId : true);
-  const fill = visible ? baseFill : PAPER2;
+  const fill = verticalStage || visible ? baseFill : PAPER2;
   const clipPath = mark.clipId ? `url(#${idPrefix}-${mark.clipId})` : void 0;
   const mask = mark.maskSide ? `url(#${idPrefix}-fade-${mark.maskSide})` : void 0;
   const stroke = mark.stroke === false ? void 0 : INK2;
@@ -908,27 +908,28 @@ function Mark({ mark, idPrefix, activeKey, visibleKeys, roughness, onPreview, on
       stroke,
       strokeWidth: mark.strokeWidth,
       strokeLinejoin: mark.lineJoin,
-      strokeDasharray: inspection && !visible ? "2 4" : void 0,
+      strokeDasharray: inspection && !verticalStage && !visible ? "2 4" : void 0,
       clipPath,
       mask,
       filter: inspection && roughness > 0 ? `url(#${idPrefix}-edge)` : void 0,
       "data-base-fill": baseFill,
-      "data-key": inspection?.key,
+      "data-key": !verticalStage ? inspection?.key : void 0,
+      "data-stage-front": verticalStage ? inspection?.key : void 0,
       "data-stage-face": mark.face ? mark.stageId : void 0,
       "data-face": mark.face,
       "data-stage-outline": mark.outline ? mark.stageId : void 0,
-      role: inspection ? "img" : void 0,
-      tabIndex: inspection ? 0 : void 0,
-      "aria-label": inspection ? `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` : void 0,
-      pointerEvents: mark.face || mark.outline ? "none" : void 0,
-      onPointerDown: inspection ? (event) => event.preventDefault() : void 0,
-      onPointerEnter: inspection ? (event) => {
+      role: inspection && !verticalStage ? "img" : void 0,
+      tabIndex: inspection && !verticalStage ? 0 : void 0,
+      "aria-label": inspection && !verticalStage ? `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` : void 0,
+      pointerEvents: verticalStage || mark.face || mark.outline ? "none" : void 0,
+      onPointerDown: inspection && !verticalStage ? (event) => event.preventDefault() : void 0,
+      onPointerEnter: inspection && !verticalStage ? (event) => {
         if (event.pointerType === "mouse") onPreview(inspection);
       } : void 0,
-      onPointerLeave: inspection ? onLeave : void 0,
-      onFocus: inspection ? () => onPreview(inspection) : void 0,
-      onBlur: inspection ? onLeave : void 0,
-      children: inspection && /* @__PURE__ */ jsx2("title", { children: `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` })
+      onPointerLeave: inspection && !verticalStage ? onLeave : void 0,
+      onFocus: inspection && !verticalStage ? () => onPreview(inspection) : void 0,
+      onBlur: inspection && !verticalStage ? onLeave : void 0,
+      children: inspection && !verticalStage && /* @__PURE__ */ jsx2("title", { children: `${inspection.label}, ${format(inspection.value)}, ${percent(inspection.value, inspection.denominator)} conversion` })
     }
   ) });
 }
@@ -977,8 +978,11 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
     buildChartModel(data, "vertical", { ...normalized, ...normalized.verticalViews.isometric, verticalView: "isometric" });
   }
   const [hoverKey, setHoverKey] = useState2(null);
+  const [focusKey, setFocusKey] = useState2(null);
+  const [pinnedKey, setPinnedKey] = useState2(null);
+  const [keyboardMotion, setKeyboardMotion] = useState2(false);
   const inspections = useMemo(() => new Map(model.marks.flatMap((mark) => mark.type === "path" && mark.inspection ? [[mark.inspection.key, mark.inspection]] : [])), [model]);
-  const activeKey = hoverKey && inspections.has(hoverKey) ? hoverKey : null;
+  const activeKey = variant === "vertical" ? [focusKey, hoverKey, pinnedKey].find((key) => key && inspections.has(key)) ?? null : hoverKey && inspections.has(hoverKey) ? hoverKey : null;
   const visibleKeys = useMemo(() => activeKey && model.variant === "branching" ? connectedLinks(model, activeKey) : null, [model, activeKey]);
   const preview = (info) => {
     setHoverKey(info.key);
@@ -987,6 +991,24 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
   const leave = () => {
     setHoverKey(null);
     onInspect?.(null);
+  };
+  const verticalData = variant === "vertical" ? data : null;
+  const selectedIndex = verticalData?.findIndex((stage) => stage.id === activeKey) ?? -1;
+  const verticalStages = verticalData?.map((stage, index) => {
+    const marks = model.marks.filter((mark) => mark.type === "path" && (mark.stageId ?? mark.inspection?.key) === stage.id);
+    const annotationKeys = new Set(["number", "leader", "label", "value"].map((part) => `stage:${stage.id}:${part}`));
+    return {
+      stage,
+      index,
+      marks,
+      front: marks.find((mark) => mark.type === "path" && mark.inspection),
+      annotations: model.marks.filter((mark) => mark.type !== "path" && annotationKeys.has(mark.key))
+    };
+  }) ?? [];
+  const orderedStages = selectedIndex < 0 ? verticalStages : [...verticalStages.filter((item) => item.index !== selectedIndex), verticalStages[selectedIndex]];
+  const clearPinned = () => {
+    setPinnedKey(null);
+    if (!hoverKey && !focusKey) onInspect?.(null);
   };
   return /* @__PURE__ */ jsx2("div", { ...rootProps, ref, style: { display: "block", ...style }, children: /* @__PURE__ */ jsxs2(
     "svg",
@@ -997,7 +1019,18 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
       role: "group",
       "aria-label": `${variant} conversion funnel`,
       style: { display: "block", height: "auto", minWidth: model.width > 900 ? model.width : void 0 },
+      onPointerUp: verticalData ? (event) => {
+        if (event.pointerType !== "mouse" && !event.target.closest("[data-hit-stage]")) clearPinned();
+      } : void 0,
       children: [
+        verticalData && /* @__PURE__ */ jsx2("style", { children: `
+        .atlas-vertical-stage { transform-box: fill-box; transform-origin: center; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
+        .atlas-vertical-annotation { transition: opacity 150ms ease; }
+        .atlas-vertical-hit { cursor: pointer; }
+        .atlas-vertical-hit:focus { outline: none; }
+        @media (prefers-reduced-motion: reduce) { .atlas-vertical-stage, .atlas-vertical-annotation { transition: none; } }
+        [data-keyboard-motion="off"] .atlas-vertical-stage, [data-keyboard-motion="off"] .atlas-vertical-annotation { transition: none; }
+      ` }),
         /* @__PURE__ */ jsx2(
           StableScreenDefs,
           {
@@ -1015,7 +1048,137 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
         ),
         /* @__PURE__ */ jsx2(FadeDefs, { model, idPrefix }),
         /* @__PURE__ */ jsx2("rect", { width: model.width, height: model.height, fill: normalized.paperGrain ? `url(#${idPrefix}-grain)` : PAPER2 }),
-        model.marks.map((mark) => /* @__PURE__ */ jsx2(
+        verticalData ? /* @__PURE__ */ jsxs2("g", { "data-keyboard-motion": keyboardMotion ? "off" : void 0, children: [
+          orderedStages.map(({ stage, index, marks, front }) => {
+            const selected = index === selectedIndex;
+            const displaced = selectedIndex >= 0 && !selected;
+            const ratio = stage.value / (verticalData[0]?.value || 1);
+            const scale = 1.06 + 0.36 * (1 - ratio);
+            const transform = selected ? `translate(${12 + 12 * (1 - ratio)}px, 0px) scale(${scale})` : displaced ? `translate(-18px, ${index < selectedIndex ? -22 : 22}px) scale(.98)` : "none";
+            return /* @__PURE__ */ jsxs2(
+              "g",
+              {
+                className: "atlas-vertical-stage",
+                "data-stage": stage.id,
+                "data-active": selected || void 0,
+                style: { transform, opacity: displaced ? 0.28 : 1 },
+                children: [
+                  marks.map((mark) => /* @__PURE__ */ jsx2(
+                    Mark,
+                    {
+                      mark,
+                      idPrefix,
+                      activeKey,
+                      visibleKeys: null,
+                      roughness: normalized.roughness ?? 0.15,
+                      onPreview: preview,
+                      onLeave: leave,
+                      verticalStage: true
+                    },
+                    mark.key
+                  )),
+                  focusKey === stage.id && front?.type === "path" && /* @__PURE__ */ jsx2(
+                    "path",
+                    {
+                      d: front.d,
+                      fill: "none",
+                      stroke: INK2,
+                      strokeWidth: 2,
+                      pointerEvents: "none",
+                      "data-focus-outline": ""
+                    }
+                  )
+                ]
+              },
+              stage.id
+            );
+          }),
+          verticalStages.map(({ stage, annotations }) => /* @__PURE__ */ jsx2(
+            "g",
+            {
+              className: "atlas-vertical-annotation",
+              "data-stage-annotation": stage.id,
+              style: { opacity: selectedIndex >= 0 && stage.id !== activeKey ? 0.4 : 1 },
+              children: annotations.map((mark) => /* @__PURE__ */ jsx2(
+                Mark,
+                {
+                  mark,
+                  idPrefix,
+                  activeKey,
+                  visibleKeys: null,
+                  roughness: normalized.roughness ?? 0.15,
+                  onPreview: preview,
+                  onLeave: leave
+                },
+                mark.key
+              ))
+            },
+            `annotation:${stage.id}`
+          )),
+          verticalStages.map(({ stage, marks, front }) => {
+            if (!front || front.type !== "path" || !front.inspection) return null;
+            const info = front.inspection;
+            return /* @__PURE__ */ jsxs2(
+              "g",
+              {
+                className: "atlas-vertical-hit",
+                "data-hit-stage": "",
+                "data-key": info.key,
+                tabIndex: 0,
+                role: "button",
+                "aria-pressed": pinnedKey === info.key,
+                "aria-label": `${info.label}, ${format(info.value)}, ${percent(info.value, info.denominator)} conversion`,
+                onPointerDown: (event) => event.preventDefault(),
+                onPointerEnter: (event) => {
+                  if (event.pointerType === "mouse") {
+                    setKeyboardMotion(false);
+                    preview(info);
+                  }
+                },
+                onPointerLeave: (event) => {
+                  if (event.pointerType === "mouse") {
+                    setHoverKey(null);
+                    onInspect?.(pinnedKey ? inspections.get(pinnedKey) ?? null : null);
+                  }
+                },
+                onPointerUp: (event) => {
+                  if (event.pointerType !== "mouse") {
+                    event.stopPropagation();
+                    setKeyboardMotion(false);
+                    const next = pinnedKey === info.key ? null : info.key;
+                    setPinnedKey(next);
+                    onInspect?.(next ? info : null);
+                  }
+                },
+                onFocus: () => {
+                  setKeyboardMotion(true);
+                  setFocusKey(info.key);
+                  onInspect?.(info);
+                },
+                onBlur: () => {
+                  setKeyboardMotion(true);
+                  setFocusKey(null);
+                  onInspect?.(pinnedKey ? inspections.get(pinnedKey) ?? null : null);
+                },
+                onKeyDown: (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    const next = pinnedKey === info.key ? null : info.key;
+                    setPinnedKey(next);
+                    onInspect?.(next ? info : null);
+                  } else if (event.key === "Escape") {
+                    clearPinned();
+                  }
+                },
+                children: [
+                  /* @__PURE__ */ jsx2("title", { children: `${info.label}, ${format(info.value)}, ${percent(info.value, info.denominator)} conversion` }),
+                  marks.flatMap((mark) => mark.type === "path" && mark.fill !== "none" ? [/* @__PURE__ */ jsx2("path", { d: mark.d, fill: "transparent", stroke: "none", pointerEvents: "all" }, mark.key)] : [])
+                ]
+              },
+              `hit:${stage.id}`
+            );
+          })
+        ] }) : model.marks.map((mark) => /* @__PURE__ */ jsx2(
           Mark,
           {
             mark,

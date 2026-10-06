@@ -6,7 +6,6 @@ import { AtlasFunnel } from 'funnel-spine';
 import { normalizeOptions } from './dist/lab/options.js';
 import { createConfig } from './dist/lab/config.js';
 import { validateData } from './dist/core/data.js';
-import { PAPER } from './dist/lab/screens.js';
 
 const stages = [
   { id: 'entry', label: 'Entry', value: 100 },
@@ -92,16 +91,31 @@ await act(async () => root.render(renderTree(tree)));
 await act(async () => document.querySelector('#app [data-key]').dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
 assert.equal(inspected.at(-1), 'link:root:left');
 
-await act(async () => root.render(createElement(AtlasFunnel, { data: stages, variant: 'vertical' })));
+await act(async () => root.render(createElement(AtlasFunnel, { data: stages, variant: 'vertical', onInspect: info => inspected.push(info?.key ?? null) })));
 assert.equal(document.querySelectorAll('#app [data-stage-face]').length, 0);
 await act(async () => root.render(createElement(AtlasFunnel, {
   data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 },
+  onInspect: info => inspected.push(info?.key ?? null),
 })));
 await act(async () => document.querySelector('#app [data-key="entry"]').dispatchEvent(new dom.window.FocusEvent('focusin', { bubbles: true })));
 const faces = [...document.querySelectorAll('#app [data-stage-face]')];
 assert.equal(faces.length, 4);
-assert(faces.filter(face => face.getAttribute('data-stage-face') === 'finish').every(face => face.getAttribute('fill') === PAPER));
-assert(faces.filter(face => face.getAttribute('data-stage-face') === 'entry').every(face => face.getAttribute('fill') === face.getAttribute('data-base-fill')));
+assert(faces.every(face => face.getAttribute('fill') === face.getAttribute('data-base-fill')));
+assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0.28');
+assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, '1');
+assert.equal(document.querySelector('#app [data-stage-front="finish"]').getAttribute('fill'),
+  document.querySelector('#app [data-stage-front="finish"]').getAttribute('data-base-fill'));
+assert.equal(document.querySelector('#app [data-stage="entry"]'),
+  [...document.querySelectorAll('#app .atlas-vertical-stage')].at(-1), 'focused stage is drawn in front');
+assert.equal(document.querySelector('#app [data-keyboard-motion]').dataset.keyboardMotion, 'off');
+await act(async () => document.querySelector('#app [data-key="entry"]').dispatchEvent(new dom.window.FocusEvent('focusout', { bubbles: true })));
+assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1');
+const touch = new dom.window.Event('pointerup', { bubbles: true });
+Object.defineProperty(touch, 'pointerType', { value: 'touch' });
+await act(async () => document.querySelector('#app [data-key="finish"]').dispatchEvent(touch));
+assert.equal(document.querySelector('#app [data-key="finish"]').getAttribute('aria-pressed'), 'true');
+assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, '0.28');
+assert.equal(inspected.at(-1), 'finish');
 
 await act(async () => root.render(createElement('section', null,
   createElement(AtlasFunnel, { data: stages, options }),
