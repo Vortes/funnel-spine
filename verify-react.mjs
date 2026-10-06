@@ -143,24 +143,39 @@ await movePointer(210, 140);
 const nearScale = Number(document.querySelector('#app [data-stage-focus="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
 assert(nearScale > halfScale, 'focus grows as the cursor approaches');
 const incomingPosition = dom.window.getComputedStyle(document.querySelector('#app [data-stage="finish"]')).transform;
+const incomingOpacity = dom.window.getComputedStyle(document.querySelector('#app [data-stage="finish"]')).opacity;
 await movePointer(150, 330, false);
 assert.equal(svg.getAttribute('data-switching'), 'true', 'a direct switch animates the old prism back into the stack');
 assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.transform, incomingPosition,
   'the incoming focus starts at the visible stack position');
-assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '0',
-  'the incoming focus waits for the next frame before expanding');
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, incomingOpacity,
+  'the visible stack copy transfers to the focus layer without a brightness jump');
+assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '0',
+  'only one copy of the incoming prism is visible during the handoff');
 flushFrames();
 assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '1');
-assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '0');
+assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '0.28',
+  'the outgoing prism stays on its focus layer while returning to the stack');
+assert.equal(document.querySelector('#app [data-stage="entry"]').style.opacity, '0');
 assert.deepEqual([...document.querySelectorAll('#app .atlas-vertical-stage')].map(group => group.dataset.stage), ['entry', 'finish'], 'stage DOM order stays fixed when switching rapidly');
 await movePointer(150, 140);
 assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '1');
 await movePointer(500, 140);
-assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1');
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '1',
+  'a returning prism remains on one layer until its movement finishes');
 assert.equal(inspected.at(-1), null);
 assert.equal(svg.hasAttribute('data-proximity-active'), false);
+const returningFocus = document.querySelector('#app [data-stage-focus="finish"]');
+let stillMoving = true;
+returningFocus.getAnimations = () => stillMoving ? [{ playState: 'running', transitionProperty: 'transform' }] : [];
 await new Promise(resolve => setTimeout(resolve, 175));
+assert.equal(svg.hasAttribute('data-switching'), true, 'the handoff stays active while a prism is still moving');
+stillMoving = false;
+await new Promise(resolve => setTimeout(resolve, 40));
 assert.equal(svg.hasAttribute('data-switching'), false);
+assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1');
+assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '0');
+delete returningFocus.getAnimations;
 await movePointer(150, 330);
 assert.equal(svg.getAttribute('data-switching'), 'true', 'crossing a short gap still animates the prism handoff');
 await act(async () => root.render(createElement(AtlasFunnel, {
