@@ -9,7 +9,6 @@ export type IdleMotionValues = {
   flow: { enabled: boolean; fallTime: number; dotRate: number; dotSize: number };
   hatch: { enabled: boolean; strokes: number; reach: number; weight: number; drawTime: number; hold: number; eraseTime: number; sideFace: boolean;
     directions: number; angleStep: number; jitter: number; mix: string; style: string; stippleDensity: number; stippleSize: number; halftoneDensity: number; halftoneDotSize: number };
-  yieldToHover: boolean;
 };
 type Point = { x: number; y: number };
 type Gap = { group: SVGGElement; clip: SVGRectElement; bottom: number; x0: number; x1: number; depth: Point; landFront: number; rate: number; carry: number };
@@ -57,7 +56,7 @@ let instances = 0;
 
 /** Removes every node and style the idle motion adds, for exporting a still figure. */
 export function stripIdleMotion(svg: SVGSVGElement) {
-  svg.querySelectorAll('[data-idle-flow],[data-idle-hatch],[data-idle-clip]').forEach(node => node.remove());
+  svg.querySelectorAll('[data-idle-flow],[data-idle-hatch],[data-idle-clip],[data-idle-mirror]').forEach(node => node.remove());
   svg.querySelectorAll<SVGElement>('.atlas-vertical-stage').forEach(stage => stage.style.removeProperty('translate'));
 }
 
@@ -89,6 +88,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
       group.setAttribute('clip-path', `url(#${clipPath.id})`);
       group.setAttribute('pointer-events', 'none');
       group.dataset.idleFlow = String(index);
+      group.id = `idle-${instance}-flow-${index}`;
       target.append(group);
       return {
         group, clip, bottom: front[2].y, depth: { x: backLeft.x - frontLeft.x, y: backLeft.y - frontLeft.y },
@@ -125,6 +125,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
       const group = document.createElementNS(SVG, 'g');
       group.setAttribute('pointer-events', 'none');
       group.dataset.idleHatch = String(index);
+      group.id = `idle-${instance}-hatch-${index}`;
       stage.insertBefore(group, stage.querySelector('[data-stage-outline]'));
       return { group, corner: front[2], front, side, frontScreen: screenOf(frontFace), sideScreen: screenOf(sideFace),
         scale: frontHeight(stage, index) / frontHeight(stages[0], 0), carry: 0 };
@@ -197,14 +198,31 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
     const reduced = matchMedia('(prefers-reduced-motion: reduce)');
     let intensity = 1, last = performance.now(), clock = 0, frame = 0;
 
-    const interacting = () => svg.hasAttribute('data-proximity-active') || svg.hasAttribute('data-pointer-tracking')
-      || !!svg.querySelector('[aria-pressed="true"]') || svg.contains(document.activeElement);
+    // Motion keeps playing while a stage is inspected. Hover hides the inspected stage and shows an enlarged copy,
+    // so the copy floats with its stage and mirrors the live marks and landing dots through <use> references.
+    const focusGroups = stages.map((_, index) => svg.querySelector<SVGGElement>(`.atlas-vertical-focus[data-stage-index="${index}"]`));
+    const mirror = (focus: SVGGElement | null, id: string, before: Element | null) => {
+      if (!focus) return;
+      const use = document.createElementNS(SVG, 'use');
+      use.setAttribute('href', `#${id}`);
+      use.dataset.idleMirror = '';
+      focus.insertBefore(use, before);
+    };
+    focusGroups.forEach((focus, index) => {
+      mirror(focus, `idle-${instance}-hatch-${index}`, focus?.querySelector('[data-stage-outline]') ?? null);
+      if (index > 0) mirror(focus, `idle-${instance}-flow-${index - 1}`, null);
+    });
+    // Hover pushes neighbouring stages apart with a translateY transform; dots and gap clips follow that offset too.
+    const hoverShift = (group: SVGGElement) => {
+      const values = /matrix\(([^)]+)\)/.exec(window.getComputedStyle(group).transform)?.[1].split(',').map(Number);
+      return values?.[5] ?? 0;
+    };
 
     const tick = (now: number) => {
       const dt = Math.min(.05, (now - last) / 1000);
       last = now;
       const m = motion.current!;
-      const goal = reduced.matches || (m.yieldToHover && interacting()) ? 0 : 1;
+      const goal = reduced.matches ? 0 : 1;
       intensity += (goal - intensity) * (1 - Math.exp(-dt / (goal ? .45 : .12)));
       clock += dt;
       const offsets = stages.map((group, index) => {
@@ -216,9 +234,11 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
         };
       });
       stages.forEach((group, index) => {
-        const { x, y } = offsets[index];
-        group.style.translate = x || y ? `${x.toFixed(3)}px ${y.toFixed(3)}px` : '';
+        const { x, y } = offsets[index], translate = x || y ? `${x.toFixed(3)}px ${y.toFixed(3)}px` : '';
+        group.style.translate = translate;
+        if (focusGroups[index]) focusGroups[index]!.style.translate = translate;
       });
+      const shifts = gaps.length && m.flow.enabled ? stages.map(hoverShift) : stages.map(() => 0);
       const hatch = m.hatch, life = hatch.drawTime + hatch.hold * 1000 + hatch.eraseTime;
       corners.forEach((corner, index) => {
         corner.group.setAttribute('opacity', Math.min(1, intensity * 1.5).toFixed(3));
@@ -243,7 +263,8 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
         }
       }
       gaps.forEach((gap, index) => {
-        gap.clip.setAttribute('y', String(gap.bottom + offsets[index].y - offsets[index + 1].y));
+        const relative = offsets[index].y + shifts[index] - offsets[index + 1].y - shifts[index + 1];
+        gap.clip.setAttribute('y', String(gap.bottom + relative));
         if (!m.flow.enabled || intensity < .5) { gap.carry = 0; return; }
         gap.carry += m.flow.dotRate * gap.rate * dt;
         while (gap.carry >= 1) {
@@ -252,7 +273,7 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
           const node = document.createElementNS(SVG, 'circle');
           node.setAttribute('fill', INK);
           gap.group.append(node);
-          dots.push({ node, gap: index, x: across + gap.depth.x * depth, from: gap.bottom + gap.depth.y * depth,
+          dots.push({ node, gap: index, x: across + gap.depth.x * depth, from: gap.bottom + relative + gap.depth.y * depth,
             to: gap.landFront + gap.depth.y * depth, born: now, fall: m.flow.fallTime });
         }
       });
@@ -275,6 +296,8 @@ export function useIdleMotion(root: RefObject<HTMLElement | null>, motion: RefOb
       cancelAnimationFrame(frame);
       document.removeEventListener('visibilitychange', visibility);
       stages.forEach(group => { group.style.translate = ''; });
+      focusGroups.forEach(focus => { if (focus) focus.style.translate = ''; });
+      svg.querySelectorAll(`[data-idle-mirror]`).forEach(use => { if (use.getAttribute('href')?.startsWith(`#idle-${instance}-`)) use.remove(); });
       corners.forEach(corner => corner.group.remove());
       gaps.forEach(gap => gap.group.remove());
       defs.querySelectorAll(`[id^="idle-${instance}-gap-"]`).forEach(node => node.remove());
@@ -324,7 +347,6 @@ export function useIdleMotionPanel(): RefObject<IdleMotionValues> {
       stippleDensity: [4, 1, 12, 0.5],
       stippleSize: [0.45, 0.2, 1.5, 0.05],
     },
-    yieldToHover: true,
     reset: { type: 'action', label: 'Reset' },
   }, { id: 'idle-motion', persist: true, onAction: action => { if (action === 'reset') dial.resetValues(); } });
   const motion = useRef(dial.values as IdleMotionValues);

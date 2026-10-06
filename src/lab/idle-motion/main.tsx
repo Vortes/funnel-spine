@@ -18,7 +18,7 @@ function IdleMotion() {
   return <main className="idle">
     <header className="idle-header">
       <div><span className="idle-overline">Prototype</span><h1>Idle motion</h1></div>
-      <p>Floating island and data flow play while the prism is at rest, then step aside when you inspect a stage.</p>
+      <p>Floating island, data flow, and corner shading keep the prism alive, including while you inspect a stage.</p>
     </header>
     <section className="idle-figure" aria-label="Vertical funnel with idle motion">
       <AtlasFunnel ref={figure} data={data} variant="vertical" options={options} seed={config.seed} />
