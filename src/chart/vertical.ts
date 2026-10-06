@@ -132,7 +132,6 @@ export function verticalModel(stageData: readonly Stage[], options: ChartOptions
     });
     if (labels) stages.forEach((stage, i) => {
       const s = stageData[i], mid = (stage.y + stage.bottom) / 2;
-      addText(`stage:${s.id}:number`, 52, mid, String(i + 1).padStart(2, '0'), 12);
       addLine(`stage:${s.id}:leader`, stage.outerRight + 12, mid, annotationX - 15, mid, .5, '2 3');
       addText(`stage:${s.id}:label`, annotationX, mid - 4, s.label, fontSize);
       addText(`stage:${s.id}:value`, annotationX, mid + 15, `${fmt(s.value)} · ${pct(s.value, max)}`, fontSize - 2);
@@ -146,7 +145,6 @@ export function verticalModel(stageData: readonly Stage[], options: ChartOptions
       focus: { x: geometry.centerX, y: geometry.centerY } });
     if (labels) {
       const mid = geometry.y + stageHeight / stageData.length / 2;
-      addText(`stage:${s.id}:number`, 52, mid, String(i + 1).padStart(2, '0'), 12);
       addLine(`stage:${s.id}:leader`, 390 + geometry.width / 2 + 12, mid, 655, mid, .5, '2 3');
       addText(`stage:${s.id}:label`, 670, mid - 4, s.label, fontSize);
       addText(`stage:${s.id}:value`, 670, mid + 15, `${fmt(s.value)} · ${pct(s.value, max)}`, fontSize - 2);

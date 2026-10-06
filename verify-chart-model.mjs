@@ -35,6 +35,7 @@ assert.equal(paths(flat)[0].d, expectedContainer.path);
 assert.equal(verticalContainerGeometry(stages, flatOptions, 0).path, expectedContainer.path);
 
 const iso = buildChartModel(stages, 'vertical', { verticalView: 'isometric', tailRatio: .65, borderRadius: 3 });
+for (const model of [flat, iso]) assert(!model.marks.some(mark => mark.key.endsWith(':number')), 'vertical figures have no stage numbers');
 assert.equal(paths(iso).length, 3);
 assert.equal(iso.marks.filter(mark => mark.type === 'path' && mark.face).length, 6);
 assert.equal(iso.clips.length, 3);
