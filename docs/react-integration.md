@@ -20,7 +20,7 @@ The package keeps Flat as the default Vertical view for existing integrations. T
 />
 ```
 
-Isometric depth ranges from 18–200 px and rotation from −45° to 45°. Its stages require decreasing quantities and a terminal taper below 100%. Flat and Isometric use the same stage data. The lab stores independent controls for the two views in `options.verticalViews`; passing an exported lab config directly to `AtlasFunnel` applies the settings for its selected view. For Continuous, `options={{ mirror: true }}` draws a symmetric funnel using full thickness for quantity.
+Isometric depth ranges from 18–200 px and rotation from −360° to 360°. Each stage is symmetric front to back and side to side, so any rotation renders as the equivalent view within ±90°, and views repeat every 180°. Within 5° of edge-on the view holds at ±85°, so front widths stay visible. Its stages require decreasing quantities and a terminal taper below 100%. Flat and Isometric use the same stage data. The lab stores independent controls for the two views in `options.verticalViews`; passing an exported lab config directly to `AtlasFunnel` applies the settings for its selected view. For Continuous, `options={{ mirror: true }}` draws a symmetric funnel using full thickness for quantity.
 
 Pass a connected bucket tree for `branching`. There is one entry bucket, each child has one parent, and every non-final bucket distributes all of its incoming quantity, including drop-off. A node's optional `value` asserts its quantity. Links must have positive finite quantities and unique source/target pairs. The renderer rejects disconnected nodes, cycles, merges, incomplete splits, and mismatched declared values.
 

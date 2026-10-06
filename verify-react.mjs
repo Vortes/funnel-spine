@@ -30,6 +30,10 @@ const verticalConfig = createConfig('vertical');
 assert.equal(verticalConfig.options.proximityRadius, 20);
 assert.equal(normalizeOptions(verticalConfig.options).isoDepth, verticalConfig.options.verticalViews.isometric.isoDepth);
 const serverVertical = renderToString(createElement(AtlasFunnel, { data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 } }));
+const rotated = isoRotation => renderToString(createElement(AtlasFunnel, { data: stages, variant: 'vertical', idPrefix: 'turn', options: { verticalView: 'isometric', tailRatio: .65, isoRotation } }));
+assert.equal(rotated(210), rotated(30));
+assert.equal(rotated(-315), rotated(45));
+assert.throws(() => normalizeOptions({ isoRotation: 361 }), /isoRotation/);
 assert.match(serverVertical, /data-stage-face="entry"/);
 assert.throws(() => validateData([{ id: 1, label: 'Bad', value: 10 }, stages[1]]), /unique string id/);
 
@@ -250,4 +254,4 @@ assert.deepEqual(errors, [], 'React should hydrate the server SVG without replac
 assert(hydrateHost.querySelector('svg [data-key="entry"]'));
 await act(async () => hydrated.unmount());
 dom.window.close();
-console.log('Verified React SVG SSR and hydration, geometry options, proximity radius, DOM props and refs, focus inspection without pinning, stable branching keys, and multiple SVG instances.');
+console.log('Verified React SVG SSR and hydration, geometry options, full-turn rotation, proximity radius, DOM props and refs, focus inspection without pinning, stable branching keys, and multiple SVG instances.');

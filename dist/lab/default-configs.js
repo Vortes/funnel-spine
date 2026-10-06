@@ -84,7 +84,7 @@ export const defaultConfigs={
       "nodeWidth": 2.5,
       "verticalView": "isometric",
       "isoDepth": 36,
-      "isoRotation": 30,
+      "isoRotation": 45,
       "verticalViews": {
         "isometric": {
           "texture": "am",
@@ -103,7 +103,7 @@ export const defaultConfigs={
           "borderRadius": 6,
           "tailRatio": 0.15,
           "isoDepth": 36,
-          "isoRotation": 30
+          "isoRotation": 45
         },
         "flat": {
           "texture": "mixed",
@@ -122,7 +122,7 @@ export const defaultConfigs={
           "borderRadius": 3,
           "tailRatio": 0.15,
           "isoDepth": 36,
-          "isoRotation": 30
+          "isoRotation": 45
         }
       }
     },

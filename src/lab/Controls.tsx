@@ -31,7 +31,7 @@ const shapes = {
       ['stageHeight', 'Funnel height', 250, 330, 5, 'px'],
       ['stageGap', 'Stage gap', 0, 20, 1, 'px'],
       ['isoDepth', 'Projection depth', 18, 200, 2, 'px'],
-      ['isoRotation', 'View rotation', -45, 45, 5, '°'],
+      ['isoRotation', 'View rotation', -360, 360, 5, '°'],
       ['borderRadius', 'Border radius', 0, 20, 1, 'px'],
       ['tailRatio', 'Terminal taper', .15, .95, .05, '%'],
     ],

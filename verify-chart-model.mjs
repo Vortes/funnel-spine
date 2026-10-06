@@ -92,7 +92,8 @@ assert.deepEqual(graph, graphSnapshot);
       near(side[1].x - side[0].x, depth[1].x - depth[0].x, 'side depth x'); near(side[1].y - side[0].y, depth[1].y - depth[0].y, 'side depth y');
       near((side[2].x - side[1].x) * (br.y - tr.y), (side[2].y - side[1].y) * (br.x - tr.x), 'side face parallelogram');
     }
-    near(Math.atan2(-(depth[1].y - depth[0].y), depth[1].x - depth[0].x) * 180 / Math.PI, 30, 'depth angle');
+    const turn = preset.options.isoRotation * Math.PI / 180;
+    near(Math.atan2(-(depth[1].y - depth[0].y), depth[1].x - depth[0].x), Math.atan2(Math.cos(turn) / 1.5, 2 * Math.sin(turn)), 'depth angle');
   }
   const apexes = preset.data.map(stage => {
     const [tl, tr, br, bl] = faces(buildChartModel(preset.data, 'vertical', preset.options), stage.id).front;

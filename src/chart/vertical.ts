@@ -55,8 +55,17 @@ function roundedPolygonPath(points: Point[], radius: number): string {
   return `M ${corners[0].entry.x} ${corners[0].entry.y} ${corners.map(({ point, exit }, i) => `Q ${point.x} ${point.y} ${exit.x} ${exit.y} L ${corners[(i + 1) % corners.length].entry.x} ${corners[(i + 1) % corners.length].entry.y}`).join(' ')} Z`;
 }
 
+// Each stage is a trapezoid extruded in depth, symmetric front to back and side to side, so a half turn about the
+// vertical axis gives the same solid. Any rotation therefore maps to an equivalent view within ±90°. Views within 5°
+// of edge-on hold at ±85° so front widths, which encode quantity, never vanish.
+export function equivalentRotation(degrees: number): number {
+  let view = ((degrees % 180) + 180) % 180;
+  if (view > 90) view -= 180;
+  return Math.max(-85, Math.min(85, view));
+}
+
 export function isometricStageGeometry(data: readonly Stage[], { stageHeight = 310, stageGap = 20, tailRatio = .65, isoDepth = 36, isoRotation = 30, borderRadius = 0 }: Pick<ChartOptions, 'stageHeight' | 'stageGap' | 'tailRatio' | 'isoDepth' | 'isoRotation' | 'borderRadius'> = {}) {
-  const angle = isoRotation * Math.PI / 180, baseline = Math.cos(Math.PI / 6);
+  const angle = equivalentRotation(isoRotation) * Math.PI / 180, baseline = Math.cos(Math.PI / 6);
   const dx = isoDepth * Math.sin(angle) / .5, rise = isoDepth * Math.cos(angle) / (baseline * Math.sqrt(3));
   const { widths: linearWidths } = verticalRimGeometry(data, { stageHeight, stageGap, tailRatio });
   const widths = linearWidths.map(width => width * Math.cos(angle) / baseline);

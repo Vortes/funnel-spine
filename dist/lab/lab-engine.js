@@ -54,8 +54,10 @@ function roundedPolygonPath(points,radius){
  });
  return `M ${corners[0].entry.x} ${corners[0].entry.y} ${corners.map(({point,exit},i)=>`Q ${point.x} ${point.y} ${exit.x} ${exit.y} L ${corners[(i+1)%corners.length].entry.x} ${corners[(i+1)%corners.length].entry.y}`).join(' ')} Z`;
 }
+// A half turn gives the same extruded trapezoid, so any rotation maps to an equivalent view within ±90°, held at ±85° near edge-on.
+export function equivalentRotation(degrees){let view=((degrees%180)+180)%180;if(view>90)view-=180;return Math.max(-85,Math.min(85,view));}
 export function isometricStageGeometry(data,{stageHeight=310,stageGap=20,tailRatio=.65,isoDepth=36,isoRotation=30,borderRadius=0}={}){
- const angle=isoRotation*Math.PI/180,baseline=Math.cos(Math.PI/6);
+ const angle=equivalentRotation(isoRotation)*Math.PI/180,baseline=Math.cos(Math.PI/6);
  const dx=isoDepth*Math.sin(angle)/.5,rise=isoDepth*Math.cos(angle)/(baseline*Math.sqrt(3));
  const {widths:linearWidths}=verticalRimGeometry(data,{stageHeight,stageGap,tailRatio}),widths=linearWidths.map(width=>width*Math.cos(angle)/baseline);
  if(widths.some((width,i)=>i&&width>=widths[i-1]))throw new Error('Isometric stages need decreasing quantities and a terminal taper below 100%.');

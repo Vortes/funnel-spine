@@ -18,6 +18,7 @@ export declare function verticalContainerGeometry(data: readonly Stage[], option
     bottomLeft: number;
     bottomRight: number;
 };
+export declare function equivalentRotation(degrees: number): number;
 export declare function isometricStageGeometry(data: readonly Stage[], { stageHeight, stageGap, tailRatio, isoDepth, isoRotation, borderRadius }?: Pick<ChartOptions, 'stageHeight' | 'stageGap' | 'tailRatio' | 'isoDepth' | 'isoRotation' | 'borderRadius'>): {
     key: string;
     y: number;
