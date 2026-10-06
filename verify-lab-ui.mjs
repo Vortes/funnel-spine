@@ -49,6 +49,7 @@ const exportedSvg = new JSDOM(await exported.text(), { contentType: 'image/svg+x
 assert.equal(exportedSvg.querySelectorAll('[data-hit-stage],[data-focus-outline],[data-stage-focus]').length, 0);
 assert.equal(exportedSvg.querySelectorAll('[data-pointer-tracking]').length, 0);
 assert.equal(exportedSvg.querySelectorAll('[data-proximity-active]').length, 0);
+assert.equal(exportedSvg.querySelectorAll('[data-switching]').length, 0);
 assert([...exportedSvg.querySelectorAll('.atlas-vertical-stage')].every(stage => !stage.style.transform && !stage.style.transformOrigin && !stage.style.opacity));
 assert(exportedSvg.querySelector('[data-stage-front="converted"]').getAttribute('fill').startsWith('url(#'));
 URL.createObjectURL = createObjectURL;

@@ -140,6 +140,7 @@ await movePointer(210, 140);
 const nearScale = Number(document.querySelector('#app [data-stage-focus="entry"]').style.transform.match(/scale\(([^)]+)\)/)[1]);
 assert(nearScale > halfScale, 'focus grows as the cursor approaches');
 await movePointer(150, 330);
+assert.equal(svg.getAttribute('data-switching'), 'true', 'a direct switch animates the old prism back into the stack');
 assert.equal(document.querySelector('#app [data-stage-focus="finish"]').style.opacity, '1');
 assert.equal(document.querySelector('#app [data-stage-focus="entry"]').style.opacity, '0');
 assert.deepEqual([...document.querySelectorAll('#app .atlas-vertical-stage')].map(group => group.dataset.stage), ['entry', 'finish'], 'stage DOM order stays fixed when switching rapidly');
@@ -149,6 +150,10 @@ await movePointer(500, 140);
 assert.equal(document.querySelector('#app [data-stage="finish"]').style.opacity, '1');
 assert.equal(inspected.at(-1), null);
 assert.equal(svg.hasAttribute('data-proximity-active'), false);
+await new Promise(resolve => setTimeout(resolve, 175));
+assert.equal(svg.hasAttribute('data-switching'), false);
+await movePointer(150, 330);
+assert.equal(svg.getAttribute('data-switching'), 'true', 'crossing a short gap still animates the prism handoff');
 await act(async () => root.render(createElement(AtlasFunnel, {
   data: stages, variant: 'vertical', options: { verticalView: 'isometric', tailRatio: .65 },
   onInspect: info => inspected.push(info?.key ?? null),

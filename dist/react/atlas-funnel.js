@@ -888,6 +888,14 @@ function proximityAt(svg, x, y, radius) {
   const raw = radius ? Math.max(0, 1 - distance / radius) : Number(distance === 0);
   return raw > 0 ? { key, progress: raw * raw * (3 - 2 * raw) } : { key: null, progress: 0 };
 }
+function crossfadeDurationMs(svg) {
+  const value = window.getComputedStyle(svg).getPropertyValue("--atlas-crossfade-duration").trim();
+  const amount = Number.parseFloat(value);
+  if (!Number.isFinite(amount)) return 150;
+  if (value.endsWith("ms")) return amount;
+  if (value.endsWith("s")) return amount * 1e3;
+  return 150;
+}
 function paintVerticalFocus(svg, stages, key, progress) {
   const selectedIndex = stages.findIndex((stage) => stage.id === key);
   const strength = selectedIndex < 0 ? 0 : progress;
@@ -1058,7 +1066,9 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
   const [keyboardMotion, setKeyboardMotion] = useState2(false);
   const svgRef = useRef(null);
   const proximityRef = useRef({ key: null, progress: 0 });
+  const recentKeyRef = useRef(null);
   const frameRef = useRef(null);
+  const switchTimerRef = useRef(null);
   const inspections = useMemo(() => new Map(model.marks.flatMap((mark) => mark.type === "path" && mark.inspection ? [[mark.inspection.key, mark.inspection]] : [])), [model]);
   const activeKey = variant === "vertical" ? [focusKey, hoverKey, pinnedKey].find((key) => key && inspections.has(key)) ?? null : hoverKey && inspections.has(hoverKey) ? hoverKey : null;
   const visibleKeys = useMemo(() => activeKey && model.variant === "branching" ? connectedLinks(model, activeKey) : null, [model, activeKey]);
@@ -1094,6 +1104,10 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
   useEffect2(() => () => {
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
+    if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
+    switchTimerRef.current = null;
+    recentKeyRef.current = null;
+    svgRef.current?.removeAttribute("data-switching");
   }, [model]);
   const stopFrame = () => {
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
@@ -1109,12 +1123,24 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
       next.progress = 0;
     }
     const previous = proximityRef.current.key;
+    const recent = recentKeyRef.current;
+    const now = window.performance.now();
+    const outgoing = previous ?? (recent && now - recent.at < 400 ? recent.key : null);
     proximityRef.current = next;
+    if (next.key) recentKeyRef.current = { key: next.key, at: now };
     setKeyboardMotion(false);
     svg.setAttribute("data-pointer-tracking", "true");
     if (next.key) svg.setAttribute("data-proximity-active", "true");
     else svg.removeAttribute("data-proximity-active");
     if (previous !== next.key) {
+      if (outgoing && next.key && outgoing !== next.key && verticalTransition !== "none" && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+        if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
+        svg.setAttribute("data-switching", "true");
+        switchTimerRef.current = window.setTimeout(() => {
+          svg.removeAttribute("data-switching");
+          switchTimerRef.current = null;
+        }, crossfadeDurationMs(svg) + 16);
+      }
       setHoverKey(next.key);
       onInspect?.(next.key ? inspections.get(next.key) ?? null : pinnedKey ? inspections.get(pinnedKey) ?? null : null);
     }
@@ -1129,9 +1155,13 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
     if (!verticalData || event.pointerType !== "mouse") return;
     const svg = svgRef.current;
     proximityRef.current = { key: null, progress: 0 };
+    recentKeyRef.current = null;
     stopFrame();
     svg?.removeAttribute("data-pointer-tracking");
     svg?.removeAttribute("data-proximity-active");
+    svg?.removeAttribute("data-switching");
+    if (switchTimerRef.current !== null) window.clearTimeout(switchTimerRef.current);
+    switchTimerRef.current = null;
     setHoverKey(null);
     const key = focusKey ?? pinnedKey;
     if (svg) paintVerticalFocus(svg, verticalData, key, key ? 1 : 0);
@@ -1181,6 +1211,11 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
         [data-vertical-transition="overlap"][data-pointer-tracking="true"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms; }
         [data-vertical-transition="relay"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-relay-duration, 75ms) ease-in; }
         [data-vertical-transition="relay"][data-pointer-tracking="true"] .atlas-vertical-focus[data-visible] { transition-delay: var(--atlas-relay-duration, 75ms); }
+        [data-pointer-tracking="true"][data-switching="true"] .atlas-vertical-stage, [data-pointer-tracking="true"][data-switching="true"] .atlas-vertical-focus { transition: transform var(--atlas-crossfade-duration, 150ms) cubic-bezier(.645,.045,.355,1), opacity var(--atlas-crossfade-duration, 150ms) ease; }
+        [data-vertical-transition="overlap"][data-pointer-tracking="true"][data-switching="true"] .atlas-vertical-focus { transition: transform var(--atlas-crossfade-duration, 150ms) cubic-bezier(.645,.045,.355,1), opacity var(--atlas-crossfade-duration, 150ms) ease-out var(--atlas-overlap-delay, 50ms); }
+        [data-vertical-transition="overlap"][data-pointer-tracking="true"][data-switching="true"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms, 0ms; }
+        [data-vertical-transition="relay"][data-pointer-tracking="true"][data-switching="true"] .atlas-vertical-focus { transition: transform var(--atlas-crossfade-duration, 150ms) cubic-bezier(.645,.045,.355,1), opacity var(--atlas-relay-duration, 75ms) ease-in; }
+        [data-vertical-transition="relay"][data-pointer-tracking="true"][data-switching="true"] .atlas-vertical-focus[data-visible] { transition-delay: 0ms, var(--atlas-relay-duration, 75ms); }
         [data-vertical-transition="none"] .atlas-vertical-stage, [data-vertical-transition="none"] .atlas-vertical-focus { transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 0ms; }
         [data-vertical-transition="none"][data-pointer-tracking="true"] .atlas-vertical-stage, [data-vertical-transition="none"][data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity 0ms; }
         @media (prefers-reduced-motion: reduce) {
