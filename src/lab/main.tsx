@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DialRoot, useDialKit } from 'dialkit';
 import { validateData } from '../../dist/core/data.js';
 import { createConfig, parseConfig, sampleData, setVerticalControl, setVerticalView } from '../../dist/lab/config.js';
 import { PrintSettings } from './Controls';
@@ -26,6 +27,9 @@ function loadSaved(): { items: SavedConfig[]; available: boolean } {
 }
 
 function App() {
+  const { playbackSpeed } = useDialKit('Prism crossfade', {
+    playbackSpeed: [1, 0.25, 4, 0.05],
+  }, { id: 'prism-crossfade', persist: true });
   const [configs, setConfigs] = useState<Record<Variant, LabConfig>>(() => Object.fromEntries(variants.map(variant => [variant, createConfig(variant)])) as Record<Variant, LabConfig>);
   const [variant, setVariant] = useState<Variant>('vertical');
   const [introToken, setIntroToken] = useState(0);
@@ -202,7 +206,7 @@ function App() {
       <div className="workspace">
         <PrintSettings variant={variant} options={config.options} seed={config.seed} seedDraft={seedDraft} onOptionChange={updateOption} onVerticalViewChange={changeVerticalView} onSeedDraft={setSeedDraft} onSeedCommit={commitSeed} onSample={() => sample(crypto.getRandomValues(new Uint32Array(1))[0])} onReset={() => { replaceConfig(createConfig(variant) as LabConfig); showNotice('Variant reset'); }} />
         <div className="working-area">
-          <FigurePanel config={config} introToken={introToken} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
+          <FigurePanel config={config} crossfadeDuration={150 / playbackSpeed} introToken={introToken} inspected={inspected} infos={infos} error={renderError} svgRef={svgRef} onInspect={inspect} onPathsChange={pathsChanged} onRenderError={renderFailed} onExport={exportSvg} />
           <Details config={config} view={view} dataDraft={dataDraft} dataError={dataError} infos={infos} onView={next => { setView(next); if (next === 'data') setDataDraft(JSON.stringify(config.data, null, 2)); }} onDataDraft={setDataDraft} onApplyData={applyData} onRestoreData={() => sample(config.seed)} onCopy={() => void copy()} />
         </div>
       </div>
@@ -212,6 +216,7 @@ function App() {
       </section>
     </main>
     {notice && <div id="status" role="status" className="status">{notice.text}</div>}
+    <DialRoot position="bottom-right" theme="light" defaultOpen productionEnabled />
   </>;
 }
 

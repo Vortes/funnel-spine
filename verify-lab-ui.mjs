@@ -9,6 +9,8 @@ function browser(html) {
   globalThis.localStorage = dom.window.localStorage;
   globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
+  globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  dom.window.ResizeObserver = globalThis.ResizeObserver;
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ config: null }) });
   dom.window.HTMLCanvasElement.prototype.getContext = () => null;
   Object.defineProperty(dom.window.document, 'timeline', { value: { currentTime: 0 } });
@@ -29,6 +31,9 @@ await import('./dist/lab/lab.js');
 await waitFor(() => document.querySelectorAll('#canvas [data-key]').length === 5, 'vertical figure');
 assert.match(document.querySelector('#figure-title').textContent, /Vertical funnel/);
 assert.equal(document.querySelectorAll('#canvas .atlas-vertical-stage [data-stage-face]').length, 10);
+await waitFor(() => document.querySelector('[aria-label="Playback Speed"]'), 'DialKit speed control');
+assert.equal(document.querySelector('[aria-label="Playback Speed"]').getAttribute('aria-valuenow'), '1');
+assert.equal(document.querySelector('#canvas svg')?.parentElement?.style.getPropertyValue('--atlas-crossfade-duration'), '150ms');
 const createObjectURL = URL.createObjectURL, revokeObjectURL = URL.revokeObjectURL;
 const anchorClick = dom.window.HTMLAnchorElement.prototype.click;
 let exported;

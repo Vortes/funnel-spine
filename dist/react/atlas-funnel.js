@@ -1164,12 +1164,12 @@ var AtlasFunnel = forwardRef(function AtlasFunnel2({
       } : void 0,
       children: [
         verticalData && /* @__PURE__ */ jsx2("style", { children: `
-        .atlas-vertical-stage, .atlas-vertical-focus { transform-box: view-box; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity 150ms ease; }
+        .atlas-vertical-stage, .atlas-vertical-focus { transform-box: view-box; transition: transform 240ms cubic-bezier(.645,.045,.355,1), opacity var(--atlas-crossfade-duration, 150ms) ease; }
         .atlas-vertical-annotation { transition: opacity 150ms ease; }
         .atlas-vertical-hit { cursor: pointer; }
         [data-proximity-active="true"] { cursor: pointer; }
         .atlas-vertical-hit:focus { outline: none; }
-        [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity 150ms ease; }
+        [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: opacity var(--atlas-crossfade-duration, 150ms) ease; }
         @media (prefers-reduced-motion: reduce) {
           .atlas-vertical-stage, .atlas-vertical-focus, .atlas-vertical-annotation,
           [data-pointer-tracking="true"] .atlas-vertical-stage, [data-pointer-tracking="true"] .atlas-vertical-focus { transition: none; }

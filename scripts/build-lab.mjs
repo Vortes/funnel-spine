@@ -14,6 +14,7 @@ const sharedOptions = {
 };
 const targets = [
   { entryPoints: ['src/lab/main.tsx'], outfile: 'dist/lab/lab.js' },
+  { entryPoints: ['src/lab/dialkit.css'], outfile: 'dist/lab/dialkit.css' },
   { entryPoints: ['src/lab/particle-main.tsx'], outfile: 'dist/lab/vertical-particles/study.js' },
 ];
 
